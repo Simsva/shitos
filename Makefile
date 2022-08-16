@@ -1,11 +1,11 @@
-# CC=gcc -elf_i386
-CC=/opt/cross/bin/i686-elf-gcc
-# AS=as --32
+CC=i686-elf-gcc
 AS=nasm
-# LD=ld -m elf_i386
-LD=/opt/cross/bin/i686-elf-ld
+LD=i686-elf-ld
 
 CFLAGS=-m32 -std=c99 -O2 -g -fno-pie -fno-stack-protector
+CFLAGS+=-nostdlib -nostdinc -ffreestanding
+# Maybe bad for optimizations?
+CFLAGS+=-fno-builtin-function -fno-builtin
 ASFLAGS=-f elf32 -w+orphan-labels
 LDFLAGS=
 

@@ -6,3 +6,6 @@ bin/
 *.elf
 
 .ccls-cache/
+
+# User config
+.envrc

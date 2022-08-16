@@ -106,7 +106,7 @@ _start:
     mov es, ax
     mov fs, ax
     mov gs, ax
-    ;; mov ss, ax              ; this mov does werid stuff and I do not like it
+    ;; mov ss, ax                  ; this mov does werid stuff and I do not like it
     jmp 8:entry32
 
 bits 32
