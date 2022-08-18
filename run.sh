@@ -15,7 +15,7 @@ print_help() {
   echo "$help_str"
 }
 
-qemu_args="-drive format=raw,file=boot.iso"
+qemu_args="-drive format=raw,file=shitos.iso"
 gdb_args="-x gdb/run.gdb"
 
 # Arguments

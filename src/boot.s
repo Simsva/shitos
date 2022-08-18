@@ -1,3 +1,4 @@
+    ;; DO NOT USE
 bits 16
 ;; org 0
 
@@ -32,19 +33,20 @@ _start:
     mov cx, 20
     mov dl, byte [drive_num]
     mov si, disk_packet
-    mov word [mem_segment], 0x1000
-    mov word [sector], 1
+    ;; +0 = 0x10, +1 = 0x00, +2 = 0x0040
+    mov word [mem_segment], 0x1000 ; +6
+    mov word [sector], 1        ; +8
 .sector_loop:
     mov ah, 0x42
     int 13h
     jc disk_error
 
-    add word [sector], 64
-    add word [offset], 0x8000
+    add word [sector], 64       ; +8
+    add word [offset], 0x8000   ; +4
     jnc .sector_same_segment
 
-    add word [mem_segment], 0x1000
-    mov word [offset], 0x0000
+    add word [mem_segment], 0x1000 ; +6
+    mov word [offset], 0x0000      ; +4
 .sector_same_segment:
     loop .sector_loop
 
