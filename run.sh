@@ -26,6 +26,8 @@ while getopts ":hd:D" o; do case "$o" in
   d) debug=1 && run_gdb=1
     case "$OPTARG" in
       bootsect) gdb_args="$gdb_args -ex debug_bootsect" ;;
+      stage1) gdb_args="$gdb_args -ex debug_stage1" ;;
+      stage2) gdb_args="$gdb_args -ex debug_stage2" ;;
       kernel) gdb_args="$gdb_args -ex debug_kernel" ;;
     esac ;;
   D) debug=1 ;;
