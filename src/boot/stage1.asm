@@ -106,7 +106,7 @@ seppuku:
 
     ;; Non-code stuff
 
-str_booting:    db "booting...",0xd,0xa,0
+str_booting:    db "shitos bootloader",0xd,0xa,0
 str_lba_error:  db "LBA not supported...",0xd,0xa,0
 
     ;; INT 13h packet

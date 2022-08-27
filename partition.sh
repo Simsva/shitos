@@ -30,6 +30,7 @@ p
 +$((sectors - 1))
 t
 0b
+a
 p
 w
 EOF
