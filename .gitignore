@@ -6,6 +6,7 @@ bin/
 *.elf
 
 .ccls-cache/
+compile_commands.json
 
 # User config
 .envrc

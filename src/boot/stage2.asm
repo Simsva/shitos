@@ -2,6 +2,7 @@ bits 16
 
 section .text
 
+    ;; NOTE: old stage2, going to rewrite later
 global _start
 _start:
     ;; read partition entry into part_entry
