@@ -2,6 +2,8 @@
 bits 16
 ;; org 0
 
+%define SECTORS 0x80
+
 section .text
 
 global _start
@@ -41,7 +43,7 @@ _start:
     int 13h
     jc disk_error
 
-    add word [sector], 64       ; +8
+    add word [sector], SECTORS  ; +8
     add word [offset], 0x8000   ; +4
     jnc .sector_same_segment
 
@@ -98,7 +100,7 @@ _start:
     mov cr0, eax
 
     ;; jump to flush prefetch queue
-    jmp .flush                  ; NOTE: why this?
+    jmp .flush
 .flush:
     lidt [idt]
     lgdt [gdtp]
@@ -195,7 +197,7 @@ print:
     ret
 
 seppuku:
-    ;; TODO: power off?
+    hlt
     jmp seppuku
 
 str_booting:    db "booting...",0xa,0xd,0
@@ -211,7 +213,7 @@ disk_packet:
     db 0x10
     db 0x00
 num_sectors:
-    dw 0x0040
+    dw SECTORS
 offset:
     dw 0x0000
 mem_segment:

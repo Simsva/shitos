@@ -12,7 +12,8 @@ define debug_mbr
   set architecture i8086
 
 # Will skip the "copying" to 0x600
-  break _highstart
+  # break _highstart
+  break *0x7c00
   continue
 end
 
