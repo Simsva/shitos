@@ -101,7 +101,8 @@ iso: all
 
 # combine
 	dd if=bin/$(MBR) of=$(ISO) conv=notrunc bs=446 seek=0 count=1
+# dd if=bin/$(STAGE1) of=$(ISO) conv=notrunc bs=512 seek=2048 count=2
+	dd if=bin/$(STAGE1) of=fatpart.iso conv=notrunc bs=512 seek=0 count=2
 	dd if=fatpart.iso of=$(ISO) conv=notrunc bs=512 seek=2048 count=64k
-	dd if=bin/$(STAGE1) of=$(ISO) conv=notrunc bs=512 seek=2048 count=1
 
-	rm fatpart.iso
+# rm fatpart.iso
