@@ -90,16 +90,13 @@ iso_tmp: dirs mbr kernel
 
 
 iso: all
-	./partition.sh $(ISO) 64K
-
-	dd if=/dev/zero of=fatpart.iso bs=512 count=64k
-	mkfs.vfat -F32 fatpart.iso
+# create fat partition
+	dd if=/dev/zero of=fatpart.bin bs=512 count=64k
+	mkfs.vfat -F32 fatpart.bin
+	dd if=bin/$(STAGE1) of=fatpart.bin conv=notrunc bs=512 seek=0 count=1
 # TODO: mount fs and do things
 
-# combine
-	dd if=bin/$(MBR) of=$(ISO) conv=notrunc bs=446 seek=0 count=1
-# dd if=bin/$(STAGE1) of=fatpart.iso conv=notrunc bs=512 seek=0 count=2
-	dd if=fatpart.iso of=$(ISO) conv=notrunc bs=512 seek=2048 count=64k
-	dd if=bin/$(STAGE1) of=$(ISO) conv=notrunc bs=512 seek=2048 count=1
+# partition and combine
+	./partition.sh -vfm "bin/$(MBR)" "$(ISO)" "fatpart.bin:0b::y"
 
-	rm fatpart.iso
+	rm fatpart.bin
