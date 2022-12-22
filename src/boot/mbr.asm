@@ -3,15 +3,13 @@ bits 16
 
 section .text
 
-    ;; FIXME: Does not work on hardware, maybe because of segment:offset bs?
-global _start
-_start:
+_fakestart:
     cli
 
     call _realstart
 _realstart:
     pop si                                   ; Pop ret addr (*_realstart)
-    lea si, [si - (_realstart - _start)]     ; *_start
+    lea si, [si - (_realstart - _fakestart)] ; *_fakestart
 
     xor ax, ax
     mov ss, ax
@@ -24,7 +22,7 @@ _realstart:
     mov cx, 0x100
     rep movsw
 
-    mov cl, (_highstart - _start)
+    mov cl, (_highstart - _fakestart)
     push es
     push cx
     retf                        ; Return far to es:cx (*_highstart)
@@ -86,7 +84,8 @@ read_sector:
     xchg bx, ax                 ; bx = SPT*HPC
     mov dx, WORD [sector + 2]
     cmp dx, bx
-    jae .lba_mode               ; LBA if division would overflow
+    ;; jae .lba_mode               ; LBA if division would overflow
+    jmp .lba_mode
 
     mov ax, WORD [sector]
     div bx                      ; dx = C
@@ -99,7 +98,7 @@ read_sector:
     inc cx                      ; cl = S
     or cl, dl                   ; cl = S | high bits of C
     xchg al, dh                 ; dh = H; al = 0 if no overflow
-    jz .int13h
+    ; jz .int13h
 .lba_mode:
     ;; Also resets al to 0
     mov ax, 0x4200
@@ -144,8 +143,8 @@ seppuku:
     hlt
     jmp seppuku
 
-str_nobootable: db "no active partition found",0
-str_notfound:   db "the active partition does not look bootable",0
+str_nobootable: db "no bootable partition found",0
+str_notfound:   db "hejhej",0
 str_diskerror:  db "disk error",0
 
     ;; INT 13h packet
@@ -162,4 +161,3 @@ sector:
     dq 0x0
 
 times 466 - ($ - $$) db 0
-    ;; partitions

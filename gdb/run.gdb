@@ -11,9 +11,8 @@ define debug_mbr
   set tdesc filename gdb/target.xml
   set architecture i8086
 
-# Will skip the "copying" to 0x600
-  # break _highstart
-  break *0x7c00
+# Will skip the relocation to 0x600
+  break _highstart
   continue
 end
 
@@ -30,7 +29,7 @@ define debug_stage1
   continue
 end
 
-# NOTE: old
+# NOTE: old, do not use
 define debug_stage2
   file bin/stage2.elf
 
@@ -44,7 +43,7 @@ define debug_stage2
   continue
 end
 
-# NOTE: old
+# NOTE: old, do not use
 define debug_kernel
   file bin/kernel.elf
 

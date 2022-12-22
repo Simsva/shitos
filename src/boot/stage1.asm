@@ -1,5 +1,16 @@
-bits 16
+[bits 16]
 ;; cpu 8086
+
+    ;; Memory locations
+    %define MEM_REL 0x700
+    %define MEM_ORG 0x7c00
+    %define MEM_BUF 0x8c00
+    %define BDA_BOOT 0x472      ; Boot howto flag
+
+    ;; Partitions
+    %define PRT_OFF 0x1be
+    %define PRT_NUM 4
+    %define PRT_TYP 0x0b
 
 section .text
 
@@ -36,147 +47,156 @@ bpb_drivenumber: db 0x80
                  db 'SHITOS     '
                  db 'FAT32   '
 
-    ;; FAT32 VBR "high start"
-_realstart:
-;;     int 12h
-;;     cli
-
-;;     mov cl, 6
-;;     shl ax, cl
-;;     dec ah                      ; reserve 4 KiB
-
-;;     mov es, ax
-;;     mov ss, ax
-;;     mov sp, 0x1000
-
-;;     cld
-;;     mov si, 0x7c00
-;;     xor di, di
-;;     mov ds, di
-;;     mov cx, 0x100
-;;     rep movsw                   ; copy VBR to
-;;     mov ds, ax
-
-;;     sti
-
-;;     mov cl, _highstart-_start ; offset due to BPB
-;;     push es
-;;     push cx
-;;     retf
-    mov ax, 0x7c0
-    mov es, ax
-    mov ds, ax
-    mov cx, _highstart-_start
-    push es
-    push cx
-    retf
-_highstart:
-    mov BYTE [bpb_drivenumber], dl
-    xor di, di
-    mov es, di
-    mov ah, 0x8
-    int 13h
-
-    mov si, err_geometry
-    jc print
-
-    movzx dx, dh
-    inc dx
-    mov WORD [bpb_heads], dx
-
-    and cx, 0x3f
-    mov WORD [bpb_sectors], cx
-
-    mov ax, cs
-    add ax, 0x20
-    mov es, ax
-
-    mov eax, 2
-    cdq                         ; sign extend eax to edx:eax
-    ;; FIXME: Add offset of FAT partition
-
-test:
-    call readsector
-    mov ax, [sig]
-    cmp ax, [sig+0x200]
-    mov si, err_corrupt
-    je findfile
-print:
-    mov bx, 0x0001
-    mov ah, 0x0e
-
-    lodsb
-
-    cmp al, 0
-    je seppuku
-
-    int 10h
-    jmp print
-seppuku:
-    hlt
-    jmp seppuku
-
-readsector:
-    ;; edx:eax - sector to read
-    ;; es:0    - dest
-    ;; trashes everything, assumes cs=ds
+    ;; Trampoline to call read from stage2
+    ;; Copied from FreeBSD
+    ;;
+    ;; cx:ax   - LBA to read in
+    ;; es:(bx) - buffer to read data into
+    ;; dl      - drive to read from
+    ;; dh      - num sectors to read
+xread:
+    push ss
+    pop ds
+.1:
+    push DWORD 0x0              ; Starting
+    push cx                     ;  LBA
+    push ax                     ;  block
+    push es                     ; Transfer
+    push bx                     ;  buffer
+    xor ax, ax
+    mov al, dh
+    push ax                     ; Number of blocks
+    push WORD 0x0010            ; 0 + packet size
     mov bp, sp
-    ;; add eax, DWORD [bpb_startlba]
-    ;; adc edx, 0
-
-    ;; construct disk_packet on stack
-    ;; push edx
-    ;; push eax
-    ;; push es
-    ;; push DWORD 1
-    ;; push WORD 16
-    ;; mov si, sp
-    mov DWORD [dp.sector+4], edx
-    mov DWORD [dp.sector], eax
-    mov WORD [dp.segment], es
-    mov si, dp
-
-    ;; TODO: fallback to CHS
-.lba_mode:
-    mov ax, 0x4200
-.int13:
-    inc ax,
-    xor bx, bx
-    mov dl, BYTE [bpb_drivenumber]
-    int 13h
-    jc .error
-    mov sp, bp
+    call read
+    lea sp, [bp + 0x10]
     ret
-.error:
-    mov si, err_bruh
-    jmp print
 
-err_geometry:   db "BIOS geometry error",0
-err_corrupt:    db "Corrupt boot code",0
-err_bruh:       db "bruh",0
-str_succ:       db "success",0
+_realstart:
+    cld                         ; String ops inc
+    xor cx, cx
+    mov es, cx
+    mov ds, cx
+    mov ss, cx
+    mov sp, _start
 
-dp:
-    db 0x10
-    db 0x00
-.num_blocks:
-    dw 0x0001
-.offset:
-    dw 0x0000
-.segment:
-    dw 0x07c0
-.sector:
-    dq 0x0
+    ;; Relocate code to MEM_REL
+    mov si, sp
+    mov di, MEM_REL
+    inc ch                      ; 0x100
+    rep movsw                   ; Copy 2*0x100 bytes
+
+    ;; Load the MBR and look for the active partition
+    mov si, msg_disk
+    cmp dl, 0x80                ; Hard drive?
+    jb error                    ; No
+    mov si, mbr_part
+    mov dh, 1                   ; 1 sector
+    call nread
+
+    mov si, MEM_BUF+PRT_OFF
+    mov dh, 1
+.1:
+    cmp BYTE [si + 0x4], PRT_TYP
+    jne .2
+    test BYTE [si], 0x80
+    jnz .3
+.2:
+    add si, 0x10
+    inc dh
+    cmp dh, PRT_NUM+1
+    jb .1
+
+    mov si, msg_part
+    jmp error
+
+.3:
+    mov si, msg_succ
+    jmp error
+
+nread:
+    mov bx, MEM_BUF
+    mov ax, [si + 0x8]
+    mov cx, [si + 0xa]
+    call xread.1
+    jnc ret
+    mov si, msg_read
+
+error:
+    call puts
+    mov si, msg_error
+    call puts
+    xor ah, ah                    ; Wait for
+    int 0x16                      ;  keystroke
+    mov DWORD [BDA_BOOT], 0x1234  ; Do a
+    jmp 0xf000:0xfff0             ;  warm reboot
+
+puts.0:
+    mov bx, 0x7
+    mov ah, 0xe
+    int 0x10
+puts:
+    lodsb
+    test al, al
+    jne .0
+
+    ;; Error return
+eret:
+    mov ah, 0x1
+    stc
+ret:
+    ret
+
+    ;; Reads sectors from disk
+    ;; Currently only supports LBA
+    ;;
+    ;; dl    - drive number
+    ;; stack - disk packet
+read:
+    cmp dl, 0x80                ; Hard drive?
+    jb .1                       ; No, CHS
+
+    ;; FIXME: checking for BIOS extensions
+    ;; mov bx, 0x55aa              ; Magic
+    ;; push dx                     ; Save
+    ;; mov ah, 0x41
+    ;; int 0x13                    ; Check BIOS extensions
+    ;; pop dx                      ; Restore
+    ;; jc .1                       ; If error, CHS
+    ;; cmp bx, 0xaa55              ; Magic?
+    ;; jne .1                      ; No, so use CHS
+
+    ;; test cl, 0x1                ; Packet interface?
+    ;; jz .1                       ; No, so use CHS
+
+    mov si, bp                  ; Disk packet
+    mov ah, 0x42
+    int 0x13                    ; Extended read
+    ret
+.1:
+    jmp eret                    ; CHS is not yet implemented
+
+msg_read:   db "Read",0
+msg_disk:   db "Disk",0
+msg_part:   db "Partition",0
+msg_succ:   db "Succ",0
+msg_error:  db " error",0xd,0xa,0
+
+
+times PRT_OFF-($-$$) db 0
+    ;; Mock-partition pointing to MBR LBA
+mbr_part:
+times 0x10 db 0
 
 times 0x1fe - ($-$$) db 0
 sig:    dw 0xaa55
 
  ;; sector 1 (FSInfo)
-dd 0x41615252
+;; dd 0x41615252
 
-findfile:
-    mov si, err_bruh
-    jmp seppuku
+;; findfile:
+;;     mov si, err_bruh
+;;     jmp seppuku
 
-times 0x3e2 - ($-$$) db 0
-dd 0x61417272
+;; times 0x3e2 - ($-$$) db 0
+;; dd 0x61417272

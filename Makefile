@@ -9,20 +9,16 @@ CFLAGS+=-fno-builtin-function -fno-builtin
 ASFLAGS=-f elf32 -w+orphan-labels
 LDFLAGS=
 
-# Old, do not use
-BOOTSECT=boot.bin
-BOOTSECT_SRC=src/boot.asm
-BOOTSECT_OBJ=$(BOOTSECT_SRC:.s=.o)
-
+# Source
 MBR=mbr.bin
-# MBR_SRC=src/boot/mbr.asm
-MBR_SRC=src/boot.asm
+MBR_SRC=src/boot/mbr.asm
 MBR_OBJ=$(MBR_SRC:.asm=.o)
 
 STAGE1=stage1.bin
 STAGE1_SRC=src/boot/stage1.asm
 STAGE1_OBJ=$(STAGE1_SRC:.asm=.o)
 
+# NOTE: old, do not use
 STAGE2=stage2.bin
 STAGE2_SRC=src/boot/stage2.asm
 STAGE2_OBJ=$(STAGE2_SRC:.asm=.o)
@@ -38,59 +34,60 @@ STRUCTS_OBJ=$(STRUCTS_SRC:.c=.o)
 
 ISO=shitos.iso
 
-all: dirs mbr stage1 stage2 structs
+
+all: dirs mbr stage1 structs
+
 
 clean:
-	rm -f $(BOOTSECT_OBJ) $(MBR_OBJ) $(STAGE1_OBJ) $(STAGE2_OBJ) $(STRUCTS_OBJ) $(KERNEL_OBJ) $(ISO)
+	rm -f ./bin/* $(BOOTSECT_OBJ) $(MBR_OBJ) $(STAGE1_OBJ) $(STAGE2_OBJ) $(STRUCTS_OBJ) $(KERNEL_OBJ) $(ISO)
+
 
 %.o: %.c
 	$(CC) -o $@ -c $< $(CFLAGS)
 
+
 %.o: %.asm
 	$(AS) -o $@ $< $(ASFLAGS)
+
 
 dirs:
 	mkdir -p bin
 
-bootsect_old: $(BOOTSECT_OBJ_OLD)
-	$(LD) -o ./bin/$(BOOTSECT) $^ $(LDFLAGS) -Ttext 0x7c00 --oformat=binary
-
-# used for debugging
-	$(LD) -o ./bin/$(BOOTSECT:.bin=.elf) $^ $(LDFLAGS) -Ttext 0x7c00
 
 mbr: $(MBR_OBJ)
-#	$(LD) -o ./bin/$(MBR) $^ $(LDFLAGS) -Ttext 0x0 --oformat=binary
-	$(LD) -o ./bin/$(MBR) $^ $(LDFLAGS) -Ttext 0x7c00 --oformat=binary
-
+	$(LD) -o ./bin/$(MBR) $^ $(LDFLAGS) -Ttext 0x0 --oformat=binary
 # used for debugging
-#	$(LD) -o ./bin/$(MBR:.bin=.elf) $^ $(LDFLAGS) -Ttext 0x600
-	$(LD) -o ./bin/$(MBR:.bin=.elf) $^ $(LDFLAGS) -Ttext 0x7c00
+	$(LD) -o ./bin/$(MBR:.bin=.elf) $^ $(LDFLAGS) -Ttext 0x600
+
 
 stage1: $(STAGE1_OBJ)
-	$(LD) -o ./bin/$(STAGE1) $^ $(LDFLAGS) -Ttext 0x0 --oformat=binary
-
+	$(LD) -o ./bin/$(STAGE1) $^ $(LDFLAGS) -Ttext 0x7c00 --oformat=binary
 # used for debugging
 	$(LD) -o ./bin/$(STAGE1:.bin=.elf) $^ $(LDFLAGS) -Ttext 0x7c00
 
+
+# NOTE: old, do not use
 stage2: $(STAGE2_OBJ)
 	$(LD) -o ./bin/$(STAGE2) $^ $(LDFLAGS) -Ttext 0x0000 --oformat=binary
-
 # used for debugging
 	$(LD) -o ./bin/$(STAGE2:.bin=.elf) $^ $(LDFLAGS) -Ttext 0x7c00
 
+
 kernel: $(KERNEL_OBJ)
 	$(LD) -o ./bin/$(KERNEL) $^ $(LDFLAGS) -Tsrc/link.ld
-
 # used for debugging
 	$(LD) -o ./bin/$(KERNEL:.bin=.elf) $^ $(LDFLAGS) -Tsrc/link.ld --oformat=elf32-i386
 
+
 structs: dirs
 	$(CC) -o $(STRUCTS_OBJ) -c $(STRUCTS_SRC) -O0 -g
+
 
 iso_tmp: dirs mbr kernel
 	dd if=/dev/zero of=$(ISO) bs=512 count=2880
 	dd if=bin/$(MBR) of=$(ISO) conv=notrunc bs=512 seek=0 count=1
 	dd if=bin/$(KERNEL) of=$(ISO) conv=notrunc bs=512 seek=1 count=2048
+
 
 iso: all
 	./partition.sh $(ISO) 64K
@@ -101,8 +98,8 @@ iso: all
 
 # combine
 	dd if=bin/$(MBR) of=$(ISO) conv=notrunc bs=446 seek=0 count=1
-# dd if=bin/$(STAGE1) of=$(ISO) conv=notrunc bs=512 seek=2048 count=2
-	dd if=bin/$(STAGE1) of=fatpart.iso conv=notrunc bs=512 seek=0 count=2
+# dd if=bin/$(STAGE1) of=fatpart.iso conv=notrunc bs=512 seek=0 count=2
 	dd if=fatpart.iso of=$(ISO) conv=notrunc bs=512 seek=2048 count=64k
+	dd if=bin/$(STAGE1) of=$(ISO) conv=notrunc bs=512 seek=2048 count=1
 
-# rm fatpart.iso
+	rm fatpart.iso
