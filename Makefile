@@ -35,11 +35,12 @@ STRUCTS_OBJ=$(STRUCTS_SRC:.c=.o)
 ISO=shitos.iso
 
 
-all: dirs mbr stage1 structs
+all: dirs mbr stage1 stage2 structs
 
 
 clean:
-	rm -f ./bin/* $(BOOTSECT_OBJ) $(MBR_OBJ) $(STAGE1_OBJ) $(STAGE2_OBJ) $(STRUCTS_OBJ) $(KERNEL_OBJ) $(ISO)
+	rm -f ./bin/* $(MBR_OBJ) $(STAGE1_OBJ) $(STAGE2_OBJ) $(STRUCTS_OBJ) \
+		$(KERNEL_OBJ) $(ISO)
 
 
 %.o: %.c
@@ -66,13 +67,13 @@ stage1: $(STAGE1_OBJ)
 	$(LD) -o ./bin/$(STAGE1:.bin=.elf) $^ $(LDFLAGS) -Ttext 0x7c00
 
 
-# NOTE: old, do not use
 stage2: $(STAGE2_OBJ)
-	$(LD) -o ./bin/$(STAGE2) $^ $(LDFLAGS) -Ttext 0x0000 --oformat=binary
+	$(LD) -o ./bin/$(STAGE2) $^ $(LDFLAGS) -Ttext 0x9000 --oformat=binary
 # used for debugging
-	$(LD) -o ./bin/$(STAGE2:.bin=.elf) $^ $(LDFLAGS) -Ttext 0x7c00
+	$(LD) -o ./bin/$(STAGE2:.bin=.elf) $^ $(LDFLAGS) -Ttext 0x9000
 
 
+# NOTE: old, do not use
 kernel: $(KERNEL_OBJ)
 	$(LD) -o ./bin/$(KERNEL) $^ $(LDFLAGS) -Tsrc/link.ld
 # used for debugging
@@ -83,20 +84,17 @@ structs: dirs
 	$(CC) -o $(STRUCTS_OBJ) -c $(STRUCTS_SRC) -O0 -g
 
 
-iso_tmp: dirs mbr kernel
-	dd if=/dev/zero of=$(ISO) bs=512 count=2880
-	dd if=bin/$(MBR) of=$(ISO) conv=notrunc bs=512 seek=0 count=1
-	dd if=bin/$(KERNEL) of=$(ISO) conv=notrunc bs=512 seek=1 count=2048
-
-
 iso: all
+# create "bootloader partition"
+	cat bin/$(STAGE1) bin/$(STAGE2) > bootpart.bin
+
 # create fat partition
-	dd if=/dev/zero of=fatpart.bin bs=512 count=64k
+	dd if=/dev/zero of=fatpart.bin bs=512 count=128k
 	mkfs.vfat -F32 fatpart.bin
-	dd if=bin/$(STAGE1) of=fatpart.bin conv=notrunc bs=512 seek=0 count=1
 # TODO: mount fs and do things
 
 # partition and combine
-	./partition.sh -vfm "bin/$(MBR)" "$(ISO)" "fatpart.bin:0b::y"
+	./partition.sh -vfm "bin/$(MBR)" "$(ISO)" \
+		"bootpart.bin:13::y" "fatpart.bin:0b"
 
-	rm fatpart.bin
+	rm fatpart.bin bootpart.bin

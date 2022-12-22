@@ -1,123 +1,41 @@
-bits 16
+[bits 16]
+
+    ;; Memory locations
+    %define MEM_STG1 0x700      ; location of relocated stage1
+    %define MEM_ARG 0x900       ; location of dx
+    %define MEM_ORG 0x9000      ; origin
+    %define BDA_BOOT 0x472      ; boot howto flag
 
 section .text
 
-    ;; NOTE: old stage2, going to rewrite later
 global _start
 _start:
-    ;; read partition entry into part_entry
-    xor si, si
-    mov ds, si
-    mov es, si
-    mov si, (0x600 + 446)
-.part_loop:
-    mov cx, 8
-    mov di, part_entry
+    mov si, msg_stage2
 
-    cld
-    rep movsw
-    push si
+error:
+    call puts
+    mov si, msg_error
+    call puts
+    xor ah, ah                    ; Wait for
+    int 0x16                      ;  keystroke
+    mov DWORD [BDA_BOOT], 0x1234  ; Do a
+    jmp 0xf000:0xfff0             ;  warm reboot
 
-    ;; check if partition entry is valid
-    mov al, BYTE [part_entry.status]
-    test al, 0x80
-    jz .next_part
-
-    ;; check if partition type is W32 FAT
-    mov al, BYTE [part_entry.type]
-    cmp al, 0x0b
-    je .part_loop_exit
-
-.next_part:
-    pop si
-    cmp si, (0x600 + 510)
-    jl .part_loop
-
-    mov si, str_nobootable
-    call print
-    jmp seppuku
-
-.part_loop_exit:
-    mov si, str_partfound
-    call print
-
-    pop si
-    mov ax, si
-    sub ax, (0x600 + 446)
-    shr ax, 4                   ; divide by 16
-    call print_dec
-
-    mov si, str_crlf
-    call print
-
-; TODO: find kernel in partition $si
-    jmp seppuku.loop
-
-print:
-    mov bx, 0x0001
-    mov ah, 0x0e
-
+puts.0:
+    mov bx, 0x7
+    mov ah, 0xe
+    int 0x10
+puts:
     lodsb
+    test al, al
+    jne .0
 
-    cmp al, 0
-    je .exit
-
-    int 10h
-    jmp print
-
-.exit:
+    ;; Error return
+eret:
+    mov ah, 0x1
+    stc
+ret:
     ret
 
-    ;; prints dl as hex
-print_hex:
-    mov ah, 0x0e
-    mov bx, 0x0001
-
-    mov di, dx
-    and di, 0xf0
-    shr di, 4
-    mov al, BYTE [alphanum + di]
-    int 10h
-
-    mov di, dx
-    and di, 0x0f
-    mov al, BYTE [alphanum + di]
-    int 10h
-
-    ret
-
-    ;; prints al as decimal
-    ;; NOTE: only handles single digits
-print_dec:
-    mov ah, 0x0e
-    mov bx, 0x0001
-
-    add al, 0x30
-    int 10h
-
-    ret
-
-seppuku:
-    int 18h
-.loop:
-    jmp .loop
-
-str_nobootable: db "no bootable partition found",0xd,0xa,0
-str_partfound:  db "booting partition ",0
-str_crlf:   db 0xd,0xa,0
-
-alphanum:   db "0123456789ABCDEF"
-
-part_entry:
-.status:
-    db 0x00
-.chs_first:
-    db 0,0,0
-.type:
-    db 0x00
-.chs_last:
-    db 0,0,0
-.lba_first:
-    dd 0x0
-.num_sectors:
-    dd 0x0
+msg_stage2: db "stage2 woohoo",0
+msg_error:  db " error",0xd,0xa,0

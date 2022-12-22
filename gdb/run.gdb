@@ -29,7 +29,6 @@ define debug_stage1
   continue
 end
 
-# NOTE: old, do not use
 define debug_stage2
   file bin/stage2.elf
 
@@ -38,8 +37,7 @@ define debug_stage2
   set architecture i8086
 
 # Break at where stage2 is loaded in RAM
-  break *0x7c00
-  continue
+  break *0x9000
   continue
 end
 

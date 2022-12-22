@@ -1,5 +1,7 @@
-bits 16
+[bits 16]
 ;; cpu 8086
+
+    %define PRT_OFF 0x1be
 
 section .text
 
@@ -84,8 +86,7 @@ read_sector:
     xchg bx, ax                 ; bx = SPT*HPC
     mov dx, WORD [sector + 2]
     cmp dx, bx
-    ;; jae .lba_mode               ; LBA if division would overflow
-    jmp .lba_mode
+    jae .lba_mode               ; LBA if division would overflow
 
     mov ax, WORD [sector]
     div bx                      ; dx = C
@@ -160,4 +161,7 @@ segment:
 sector:
     dq 0x0
 
-times 466 - ($ - $$) db 0
+times PRT_OFF-($-$$) db 0
+times 0x40 db 0
+
+boot_magic: dw 0xaa55

@@ -22,7 +22,7 @@ parse_part() {
 
   [ "$part_file" ] && [ ! -r "$part_file" ] \
     && die "Provided file in partition $part_num does not exist or the user\
-    does not have read access"
+does not have read access"
 
   if [ "$part_sect" ]; then
     numfmt --from=iec "$part_sect" >/dev/null 2>&1 \

@@ -2,15 +2,20 @@
 ;; cpu 8086
 
     ;; Memory locations
-    %define MEM_REL 0x700
-    %define MEM_ORG 0x7c00
-    %define MEM_BUF 0x8c00
-    %define BDA_BOOT 0x472      ; Boot howto flag
+    %define MEM_REL 0x700       ; stage1 relocation address
+    %define MEM_ARG 0x900       ; location of dx
+    %define MEM_ORG 0x7c00      ; origin
+    %define MEM_BUF 0x8e00      ; nread load area
+    %define MEM_STG2 0x9000     ; stage2 start
+    %define BDA_BOOT 0x472      ; boot howto flag
 
     ;; Partitions
-    %define PRT_OFF 0x1be
-    %define PRT_NUM 4
-    %define PRT_TYP 0x0b
+    %define PRT_OFF 0x1be       ; partition tabble offset
+    %define PRT_NUM 4           ; number of partitions
+    %define PRT_TYP 0x13        ; partition type
+
+    ;; Misc constants
+    %define NSECT 0x10          ; number of sectors of stage2 to read
 
 section .text
 
@@ -111,8 +116,33 @@ _realstart:
     jmp error
 
 .3:
-    mov si, msg_succ
-    jmp error
+    mov [MEM_ARG], dx
+    mov dh, NSECT
+    ;; due to MEM_BUF being 0x8e00 and stage1 being 0x200 in size
+    ;; stage 2 will end up on 0x9000, or MEM_STG2
+    call nread
+
+seta20:
+    cli
+.1:
+    ;; using cx==0 as a timeout because FreeBSD told me so,
+    ;; something to do with keyboard controllers on embedded hardware
+    dec cx                      ; Timeout?
+    jz .3                       ; Yes
+    in al, 0x64                 ; Get status
+    test al, 0x2                ; Busy?
+    jnz .1                      ; Yes
+    mov al, 0xd1                ; Command: write
+    out 0x64, al                ;  output port
+.2:
+    in al, 0x64                 ; Get status
+    test al, 0x2                ; Busy?
+    jnz .2                      ; Yes
+    mov al, 0xdf                ; Enable
+    out 0x60, al                ;  A20
+.3:
+    sti
+    jmp _start-MEM_ORG+MEM_STG2 ; Jump to stage2
 
 nread:
     mov bx, MEM_BUF
@@ -156,18 +186,17 @@ read:
     cmp dl, 0x80                ; Hard drive?
     jb .1                       ; No, CHS
 
-    ;; FIXME: checking for BIOS extensions
-    ;; mov bx, 0x55aa              ; Magic
-    ;; push dx                     ; Save
-    ;; mov ah, 0x41
-    ;; int 0x13                    ; Check BIOS extensions
-    ;; pop dx                      ; Restore
-    ;; jc .1                       ; If error, CHS
-    ;; cmp bx, 0xaa55              ; Magic?
-    ;; jne .1                      ; No, so use CHS
+    mov bx, 0x55aa              ; Magic
+    push dx                     ; Save
+    mov ah, 0x41
+    int 0x13                    ; Check BIOS extensions
+    pop dx                      ; Restore
+    jc .1                       ; If error, CHS
+    cmp bx, 0xaa55              ; Magic?
+    jne .1                      ; No, so use CHS
 
-    ;; test cl, 0x1                ; Packet interface?
-    ;; jz .1                       ; No, so use CHS
+    test cl, 0x1                ; Packet interface?
+    jz .1                       ; No, so use CHS
 
     mov si, bp                  ; Disk packet
     mov ah, 0x42
@@ -179,24 +208,17 @@ read:
 msg_read:   db "Read",0
 msg_disk:   db "Disk",0
 msg_part:   db "Partition",0
-msg_succ:   db "Succ",0
 msg_error:  db " error",0xd,0xa,0
 
-
 times PRT_OFF-($-$$) db 0
+times 0x30 db 0
     ;; Mock-partition pointing to MBR LBA
 mbr_part:
-times 0x10 db 0
+    db 0x80                     ; active
+    db 0x00, 0x01, 0x00         ; start CHS
+    db 0x00                     ; type
+    db 0xfe, 0xff, 0xff         ; end CHS
+    dd 0x0                      ; start LBA
+    dd 0x1                      ; number of sectors
 
-times 0x1fe - ($-$$) db 0
-sig:    dw 0xaa55
-
- ;; sector 1 (FSInfo)
-;; dd 0x41615252
-
-;; findfile:
-;;     mov si, err_bruh
-;;     jmp seppuku
-
-;; times 0x3e2 - ($-$$) db 0
-;; dd 0x61417272
+boot_magic: dw 0xaa55
