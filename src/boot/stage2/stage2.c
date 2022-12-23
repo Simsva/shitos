@@ -1,4 +1,6 @@
 #include "gdt.h"
+#include "idt.h"
+#include "isr.h"
 #include "tm_io.h"
 
 #ifndef asm
@@ -12,8 +14,9 @@ void bmain(void *esp) {
     global_esp = esp;
 
     _gdt_install();
+    _idt_install();
+    _isrs_install();
     tm_init();
-    /* TODO: IDT + IRQ */
 
     asm("sti");
 
@@ -22,5 +25,6 @@ void bmain(void *esp) {
     tm_color = 0x0f;
     tm_puts(str);
 
+    /* FIXME: throws a double fault eventually */
     for(;;) asm("hlt");
 }

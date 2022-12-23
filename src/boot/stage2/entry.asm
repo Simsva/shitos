@@ -96,10 +96,11 @@ align 32
 extern bmain
 global _entry32
 _entry32:
-    cld
     lea esp, stack
     push esp
 
+    cld                         ; SysV ABI requires the DF flag to be cleared
+                                ; on function entry
     cli
     call bmain
 

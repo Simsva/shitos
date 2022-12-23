@@ -15,3 +15,9 @@ _gdt_flush:
     jmp 0x8:.1                  ; entry 1 = ring 0 code segment
 .1:
     ret
+
+global _idt_load
+extern _idtp
+_idt_load:
+    lidt [_idtp]
+    ret

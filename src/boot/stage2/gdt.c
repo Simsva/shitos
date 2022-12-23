@@ -2,8 +2,8 @@
 #include "stddef.h"
 #include "stdint.h"
 
-struct gdt_t _gdt[GDT_SIZE];
-struct gdt_ptr_t _gdtp;
+struct gdt_entry _gdt[GDT_SIZE];
+struct gdt_ptr _gdtp;
 
 void _gdt_set_gate(int i, uint32_t base, uint32_t limit,
                    uint8_t access, uint8_t flags) {
@@ -18,15 +18,17 @@ void _gdt_set_gate(int i, uint32_t base, uint32_t limit,
     _gdt[i].access = access;
 }
 
-void _gdt_install() {
-    _gdtp.limit = (sizeof(struct gdt_t) * GDT_SIZE)-1;
-    _gdtp.base = (uint32_t)&_gdt;
+void _gdt_install(void) {
+    _gdtp.size = (sizeof(struct gdt_entry) * GDT_SIZE)-1;
+    _gdtp.base = &_gdt;
 
     _gdt_set_gate(0, 0, 0, 0, 0);
 
     /* ring 0 CS and DS */
-    _gdt_set_gate(1, 0, UINT32_MAX, 0x9a, 0xcf);
-    _gdt_set_gate(2, 0, UINT32_MAX, 0x92, 0xcf);
+    /* bit 7: present, 6-5: ring, 4: type, 3: executable, 2: directin/conforming
+     * 1: readable/writable, 0: accessed (set 0) */
+    _gdt_set_gate(1, 0, UINT32_MAX, 0x9a /* 10011010 */, 0xcf);
+    _gdt_set_gate(2, 0, UINT32_MAX, 0x92 /* 10010010 */, 0xcf);
 
     /* NOTE: the bootloader runs completely in ring 0 */
 
