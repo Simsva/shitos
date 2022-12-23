@@ -3,7 +3,7 @@
 
 #include "stdint.h"
 
-#define GDT_SIZE 6
+#define GDT_SIZE 3
 
 struct gdt_t {
     uint16_t limit_low, base_low;

@@ -93,19 +93,16 @@ gdt_end:
 bits 32
 align 32
 
-extern puts_pe
 extern bmain
 global _entry32
 _entry32:
     cld
-    lea esp, _entry32
+    lea esp, stack
     push esp
-
-    push msg_bruh
-    call puts_pe
 
     cli
     call bmain
 
-section .rodata
-msg_bruh:   db "bruh",0
+section .bss
+    resb 0x2000                 ; 8 KiB
+stack:

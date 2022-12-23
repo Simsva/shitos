@@ -24,15 +24,11 @@ void _gdt_install() {
 
     _gdt_set_gate(0, 0, 0, 0, 0);
 
-    /* kernel CS and DS */
+    /* ring 0 CS and DS */
     _gdt_set_gate(1, 0, UINT32_MAX, 0x9a, 0xcf);
     _gdt_set_gate(2, 0, UINT32_MAX, 0x92, 0xcf);
 
-    /* userland CS and DS */
-    _gdt_set_gate(3, 0, UINT32_MAX, 0xfa, 0xcf);
-    _gdt_set_gate(4, 0, UINT32_MAX, 0xf2, 0xcf);
-
-    /* TODO: TSS */
+    /* NOTE: the bootloader runs completely in ring 0 */
 
     _gdt_flush();
 }
