@@ -38,6 +38,17 @@ define debug_stage2
 
 # Break at where stage2 is loaded in RAM
   break *0x9000
+  # break _entry32
+  continue
+end
+
+define debug_stage2pe
+  file bin/stage2.elf
+
+  set architecture i386
+
+  break _entry32
+  break bmain
   continue
 end
 

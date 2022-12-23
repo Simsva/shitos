@@ -20,8 +20,9 @@ STAGE1_OBJ=$(STAGE1_SRC:.asm=.o)
 
 # NOTE: old, do not use
 STAGE2=stage2.bin
-STAGE2_SRC=src/boot/stage2.asm
-STAGE2_OBJ=$(STAGE2_SRC:.asm=.o)
+STAGE2_SRC_ASM=$(wildcard src/boot/stage2/*.asm)
+STAGE2_SRC_C=$(wildcard   src/boot/stage2/*.c)
+STAGE2_OBJ=$(STAGE2_SRC_ASM:.asm=.o) $(STAGE2_SRC_C:.c=.o)
 
 KERNEL=kernel.bin
 KERNEL_SRC_C=$(wildcard src/kernel/*.c)
@@ -40,7 +41,7 @@ all: dirs mbr stage1 stage2 structs
 
 clean:
 	rm -f ./bin/* $(MBR_OBJ) $(STAGE1_OBJ) $(STAGE2_OBJ) $(STRUCTS_OBJ) \
-		$(KERNEL_OBJ) $(ISO)
+		$(ISO)
 
 
 %.o: %.c
@@ -68,9 +69,10 @@ stage1: $(STAGE1_OBJ)
 
 
 stage2: $(STAGE2_OBJ)
-	$(LD) -o ./bin/$(STAGE2) $^ $(LDFLAGS) -Ttext 0x9000 --oformat=binary
+	$(LD) -o ./bin/$(STAGE2) $^ $(LDFLAGS) -Tsrc/boot/stage2/link.ld
 # used for debugging
-	$(LD) -o ./bin/$(STAGE2:.bin=.elf) $^ $(LDFLAGS) -Ttext 0x9000
+	$(LD) -o ./bin/$(STAGE2:.bin=.elf) $^ $(LDFLAGS) \
+		-Tsrc/boot/stage2/link.ld --oformat=elf32-i386
 
 
 # NOTE: old, do not use
