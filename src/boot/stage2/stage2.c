@@ -26,5 +26,6 @@ void bmain(void *esp) {
     tm_puts(str);
 
     /* FIXME: throws a double fault eventually */
+    asm("int $0x80");
     for(;;) asm("hlt");
 }

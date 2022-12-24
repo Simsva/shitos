@@ -30,6 +30,7 @@ global _isr1c
 global _isr1d
 global _isr1e
 global _isr1f
+global _isr80
 
 _isr00:
     cli
@@ -159,6 +160,10 @@ _isr1f:
     cli
     push byte 0x1f
     jmp isr_common_stub
+_isr80:
+    cli
+    push dword 0x80             ; dword to prevent sign extension
+    jmp isr_common_stub
 
 extern _fault_handler
 isr_common_stub:
@@ -177,14 +182,14 @@ isr_common_stub:
                                 ; on function entry
     call _fault_handler
 
-    pop ax
+    pop eax
     mov ds, ax
     mov es, ax
     mov fs, ax
     mov gs, ax
 
     popa
-    add esp, 8
+    add esp, 4                  ; clean up after int_no
 
     sti
     iret

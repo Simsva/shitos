@@ -35,6 +35,7 @@ extern void _isr1c(void);
 extern void _isr1d(void);
 extern void _isr1e(void);
 extern void _isr1f(void);
+extern void _isr80(void);
 
 void _isrs_install(void) {
     /* flag bit 7: present, 6-5: ring, 4: zero, 3-0: type */
@@ -71,6 +72,9 @@ void _isrs_install(void) {
     _idt_set_gate(0x1d, (uint32_t)_isr1d, 0x08, 0x8e);
     _idt_set_gate(0x1e, (uint32_t)_isr1e, 0x08, 0x8e);
     _idt_set_gate(0x1f, (uint32_t)_isr1f, 0x08, 0x8e);
+
+    /* NOTE: only for testing */
+    _idt_set_gate(0x80, (uint32_t)_isr80, 0x08, 0x8e);
 }
 
 const char *exception_msgs[] = {
@@ -109,9 +113,15 @@ const char *exception_msgs[] = {
 };
 
 void _fault_handler(struct int_regs r) {
+    volatile int a = 0;
     if(r.int_no < 0x20) {
         tm_color = 0x4f;
-        tm_puts(exception_msgs[r.int_no]);
+        tm_printf("int 0x%x: %s\n", r.int_no, exception_msgs[r.int_no]);
         for(;;);
     }
+
+    tm_printf("int 0x%x\n", r.int_no);
+    /* NOTE: this is needed to avoid corrupting the stack due to the last
+     *       call being optimized to jmp and push to mov */
+    a = 1;
 }

@@ -15,7 +15,7 @@
     %define PRT_TYP 0x13        ; partition type
 
     ;; Misc constants
-    %define NSECT 0x10          ; number of sectors of stage2 to read
+    %define NSECT 0x20          ; number of sectors of stage2 to read
 
 section .text
 
