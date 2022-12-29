@@ -1,6 +1,7 @@
 # Build files
 bin/
 *.o
+*.bin
 *.iso
 *.img
 *.elf

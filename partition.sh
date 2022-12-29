@@ -41,11 +41,16 @@ does not have read access"
 }
 
 usage="\
-Usage: $0 [options]... [--] output_file [partitions]...
+SYNOPSIS
+    $0 [option]... [--] output_file [partition]...
 
-OPTIONS
+DESCRIPTION
+    Create a disk image with the specified partitions and/or MBR sector.
+
+    See section PARTITION FORMAT for information on how to add partitions.
+
     -m    MBR image to use
-    -v    increment verbosity mode
+    -v    increment verbosity level
           0 = default
           1 = log debug information
           2 = log commands being run and their output
@@ -53,30 +58,29 @@ OPTIONS
     -h    print this help message
 
 PARTITION FORMAT
-    \"file:type:sectors:bootable\"
+    \"file:type:sectors:active\"
 
     Sectors will be determined by the size of file if it is provided, and if
-    both are the maximum of the two will be chosen. If file is not provided the
-    created partition will be empty.
+    both are provided, the maximum of the two will be chosen. If file is not
+    provided the created partition will be filled with zeros.
     
     Type needs to be a partition type recognized by sfdisk and sectors can be
-    provided in IEC format.
+    provided as a number, optionally using IEC prefixes for binary multiples
+    (eg. 64K or 4M).
 
-    If bootable is not empty the bootable flag will be set for the partition."
+    If active is not empty the partition will be marked as active."
 
 out_file=""
 mbr_file=""
 verbosity=0
 force=0
 
-while getopts "m:vfh" OPT; do
-  case "$OPT" in
-    m) mbr_file="$OPTARG" ;;
-    v) verbosity=$((verbosity+1)) ;;
-    f) force=1 ;;
-    *) die "$usage" ;;
-  esac
-done
+while getopts "m:vfh" OPT; do case "$OPT" in
+  m) mbr_file="$OPTARG" ;;
+  v) verbosity=$((verbosity+1)) ;;
+  f) force=1 ;;
+  *) die "$usage" ;;
+esac done
 shift "$((OPTIND-1))"
 
 # mbr_file validation
@@ -113,10 +117,10 @@ while [ "$1" ]; do
 
   [ "$verbosity" -gt 0 ] && {
     echo "Parsing partition $part_num:"
-    echo "  file    : $part_file"
-    echo "  type    : $part_type"
-    echo "  sectors : $part_sect"
-    echo "  bootable: $part_boot"
+    echo "  file   : $part_file"
+    echo "  type   : $part_type"
+    echo "  sectors: $part_sect"
+    echo "  active : $part_boot"
   }
 
   out_parts="$out_parts
@@ -159,9 +163,9 @@ for p in $parts; do
   # shellcheck disable=SC2059
   dd_cmd="$(printf "$(echo "$out_part_files" \
     | sed -E "/^$num/!d;s/^$num:(.*)/\1/")" "$first")"
-  # shellcheck disable=SC2086
   [ "$dd_cmd" ] && {
     echo "Copying custom partition $num into $out_file"
+    # shellcheck disable=SC2086
     cmd $dd_cmd
   }
 done

@@ -1,9 +1,10 @@
-# Macros
+# macros
 define qq
   kill
   quit
 end
 
+# debug Master Boot Record
 define debug_mbr
   file bin/mbr.elf
 
@@ -16,6 +17,7 @@ define debug_mbr
   continue
 end
 
+# debug stage1 bootloader
 define debug_stage1
   file bin/stage1.elf
 
@@ -29,6 +31,7 @@ define debug_stage1
   continue
 end
 
+# debug stage2 bootloader
 define debug_stage2
   file bin/stage2.elf
 
@@ -42,6 +45,7 @@ define debug_stage2
   continue
 end
 
+# debug stage2 bootloader protected mode part
 define debug_stage2pe
   file bin/stage2.elf
 
@@ -52,16 +56,8 @@ define debug_stage2pe
   continue
 end
 
-# NOTE: old, do not use
-define debug_kernel
-  file bin/kernel.elf
-
-  break *0x10000
-  continue
-end
-
-# Run
+# run
 add-symbol-file gdb/structs.o 0
 
-# Connect to QEMU
+# connect to QEMU
 target remote :1234
