@@ -36,7 +36,7 @@ void tm_putc(unsigned char c) {
             break;
 
         case '\t':
-            /* & ~7 to truncate to nearest multiple of 8 */
+            /* & ~7 to truncate to a multiple of 8 */
             x = (x + 8) & ~7;
             break;
 

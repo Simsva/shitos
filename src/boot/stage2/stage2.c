@@ -13,7 +13,7 @@ void *global_esp;
 
 uint32_t ticks = 0;
 void timer_test(struct int_regs *r) {
-    /* will print approximately every seconds */
+    /* will print approximately once every second */
     /* (runs at 18.222 Hz) */
     if(ticks++ % 18 == 0)
         tm_puts("tick");
