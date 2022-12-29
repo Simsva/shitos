@@ -4,6 +4,7 @@
 #include "string.h"
 #include "stdarg.h"
 
+static uint16_t *tm_memory = (uint16_t *)0xb8000;
 uint16_t tm_cursor = 0;
 uint8_t tm_color = 0x0f;
 static unsigned char alphanum[] = {

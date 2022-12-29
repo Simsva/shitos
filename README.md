@@ -48,3 +48,8 @@ $ ./run.sh -d debug_mode
 ```
 
 For more information see `./run.sh -h`.
+
+## TODO (remove when done)
+
+- Global header files (`stddef.h`, `stdarg.h`, `io.h`, etc.)
+- Better directory structure for C code

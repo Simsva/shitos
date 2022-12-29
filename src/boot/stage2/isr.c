@@ -37,7 +37,7 @@ extern void _isr1e(void);
 extern void _isr1f(void);
 extern void _isr80(void);
 
-void _isrs_install(void) {
+void isrs_install(void) {
     /* flag bit 7: present, 6-5: ring, 4: zero, 3-0: type */
     /* type 1110 (0xe) = interrupt gate */
     _idt_set_gate(0x00, (uint32_t)_isr00, 0x08, 0x8e);
@@ -122,6 +122,6 @@ void _fault_handler(struct int_regs r) {
 
     tm_printf("int 0x%x\n", r.int_no);
     /* NOTE: this is needed to avoid corrupting the stack due to the last
-     *       call being optimized to jmp and push to mov */
+     * call being optimized to jmp and push to mov */
     a = 1;
 }

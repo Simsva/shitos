@@ -6,6 +6,18 @@
 
 #define IDT_SIZE 0x100
 
+/* argument to all ISRs (including IRQs) */
+struct int_regs {
+    /* data segment */
+    uint32_t ds;
+    /* pushed by pusha */
+    uint32_t edi, esi, ebp, esp, ebx, edx, ecx, eax;
+    /* interrupt number pushed in each isr */
+    uint32_t int_no;
+    /* pushed automatically on interrupt */
+    uint32_t eip, cs, eflags;
+};
+
 struct idt_entry {
     uint16_t off_low, sel;
     uint8_t reserved, flags;
@@ -20,10 +32,8 @@ struct idt_ptr {
 extern struct idt_entry _idt[IDT_SIZE];
 extern struct idt_ptr _idtp;
 
-extern void _idt_load();
-
 void _idt_set_gate(uint8_t i, uint32_t offset,
                    uint16_t selector, uint8_t flags);
-void _idt_install(void);
+void idt_install(void);
 
 #endif // IDT_H_

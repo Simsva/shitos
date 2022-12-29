@@ -5,7 +5,6 @@
 
 #define TM_WIDTH  (80)
 #define TM_HEIGHT (25)
-static uint16_t *tm_memory = (uint16_t *)0xb8000;
 
 extern uint16_t tm_cursor;
 extern uint8_t tm_color;

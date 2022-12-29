@@ -19,10 +19,8 @@ struct gdt_ptr {
 extern struct gdt_entry _gdt[GDT_SIZE];
 extern struct gdt_ptr _gdtp;
 
-extern void _gdt_flush();
-
 void _gdt_set_gate(int i, uint32_t base, uint32_t limit,
                    uint8_t access, uint8_t flags);
-void _gdt_install(void);
+void gdt_install(void);
 
 #endif // GDT_H_

@@ -2,6 +2,8 @@
 
 #include "string.h"
 
+extern void _idt_load();
+
 struct idt_entry _idt[IDT_SIZE];
 struct idt_ptr _idtp;
 
@@ -15,14 +17,12 @@ void _idt_set_gate(uint8_t i, uint32_t offset,
     _idt[i].flags = flags;
 }
 
-void _idt_install(void) {
+void idt_install(void) {
     _idtp.size = (sizeof(struct idt_entry) * IDT_SIZE) - 1;
     _idtp.base = &_idt;
 
     /* initialize to zero */
     memset(&_idt, 0, _idtp.size+1);
-
-    /* TODO: add ISRs */
 
     _idt_load();
 }

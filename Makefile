@@ -3,26 +3,28 @@ AS=nasm
 LD=i686-elf-ld
 
 # FIXME: fix compiler options
-CFLAGS=-m32 -std=c99 -O2 -g -fno-pie -fno-stack-protector
+CFLAGS=-m32 -std=c99 -O2 -Wall -fno-pie -fno-stack-protector
 CFLAGS+=-nostdlib -nostdinc -ffreestanding
 # maybe bad for optimizations?
 CFLAGS+=-fno-builtin-function -fno-builtin
+# TODO: somehow toggle -g only for debugging files
+CFLAGS+=-g
 ASFLAGS=-f elf32 -w+orphan-labels
 LDFLAGS=
 
 # source files
 MBR=bin/mbr.bin
 MBR_SRC=src/boot/mbr.asm
-MBR_OBJ=$(MBR_SRC:.asm=.o)
+MBR_OBJ=$(MBR_SRC:.asm=_asm.o)
 
 STAGE1=bin/stage1.bin
 STAGE1_SRC=src/boot/stage1.asm
-STAGE1_OBJ=$(STAGE1_SRC:.asm=.o)
+STAGE1_OBJ=$(STAGE1_SRC:.asm=_asm.o)
 
 STAGE2=bin/stage2.bin
 STAGE2_SRC_ASM=$(wildcard src/boot/stage2/*.asm)
 STAGE2_SRC_C=$(wildcard src/boot/stage2/*.c)
-STAGE2_OBJ=$(STAGE2_SRC_ASM:.asm=.o) $(STAGE2_SRC_C:.c=.o)
+STAGE2_OBJ=$(STAGE2_SRC_ASM:.asm=_asm.o) $(STAGE2_SRC_C:.c=_c.o)
 STAGE2_LD=src/boot/stage2/link.ld
 
 STRUCTS_SRC=gdb/structs.c
@@ -45,12 +47,14 @@ clean:
 	@echo Clean
 	rm -f ./bin/* $(MBR_OBJ) $(STAGE1_OBJ) $(STAGE2_OBJ) $(STRUCTS_OBJ) $(BOOTPART) $(FATPART) $(ISO)
 
-%.o: %.c
+
+# hack to allow C and ASM files with the same name
+%_c.o: %.c
 	@echo "CC	$@"
 	@$(CC) -o $@ -c $< $(CFLAGS)
 
 
-%.o: %.asm
+%_asm.o: %.asm
 	@echo "AS	$@"
 	@$(AS) -o $@ $< $(ASFLAGS)
 

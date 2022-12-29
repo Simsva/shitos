@@ -2,6 +2,8 @@
 #include "stddef.h"
 #include "stdint.h"
 
+extern void _gdt_flush();
+
 struct gdt_entry _gdt[GDT_SIZE];
 struct gdt_ptr _gdtp;
 
@@ -18,7 +20,7 @@ void _gdt_set_gate(int i, uint32_t base, uint32_t limit,
     _gdt[i].access = access;
 }
 
-void _gdt_install(void) {
+void gdt_install(void) {
     _gdtp.size = (sizeof(struct gdt_entry) * GDT_SIZE)-1;
     _gdtp.base = &_gdt;
 
