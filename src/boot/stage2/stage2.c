@@ -2,12 +2,15 @@
 #include "idt.h"
 #include "irq.h"
 #include "isr.h"
+#include "io.h"
 #include "tm_io.h"
+#include "scan_code.h"
 
 #ifndef asm
 # define asm __asm__ volatile
 #endif
 
+/* menu screen offsets */
 #define MENU_BRAND_X  2
 #define MENU_BRAND_Y  2
 #define MENU_BOX_X    1
@@ -16,17 +19,26 @@
 #define MENU_LOGO_X   44
 #define MENU_LOGO_Y   7
 
-#define OPT_ON_COLOR  0x0a
-#define OPT_OFF_COLOR 0x0c
-#define OPT_COLOR(x)  ((x) ? OPT_ON_COLOR : OPT_OFF_COLOR),\
-        ((x) ? menu_opt_on : menu_opt_off)
-#define BOOT_VERBOSE  0x1
+/* boot option utils */
+#define OPT_COLOR_ON  0x0a
+#define OPT_COLOR_OFF 0x0c
+#define OPT_FMT(x)    ((x) ? OPT_COLOR_ON : OPT_COLOR_OFF),\
+                      ((x) ? menu_opt_on  : menu_opt_off)
+/* boot options */
+#define OPT_VERBOSE  0x1
+
+
+/* timer */
+#define TPS          18    /* 18.222 ~= 18 */
+#define AUTOBOOT_TIMEOUT 10
 
 void *global_esp;
+
 uint32_t ticks = 0;
 uint8_t menu_current = 0; /* 0 for main, 1 for options */
 uint8_t boot_options_default = 0x0,
         boot_options = 0x0;
+uint8_t autoboot = 1; /* set to 0 to stop autoboot */
 
 const char *brand = "\
   _____  _      _  _     ____    _____\n\
@@ -105,6 +117,9 @@ void draw_menu_clear(void) {
 }
 
 void draw_menu_main(void) {
+    draw_menu_clear();
+    menu_current = 0;
+
     tm_cursor_set(MENU_BOX_X+3, MENU_BOX_Y+2);
     tm_line_reset = MENU_BOX_X+3;
     tm_color = 0x07;
@@ -115,23 +130,83 @@ void draw_menu_main(void) {
 }
 
 void draw_menu_opts(void) {
+    draw_menu_clear();
+    menu_current = 1;
+
     tm_cursor_set(MENU_BOX_X+3, MENU_BOX_Y+2);
     tm_line_reset = MENU_BOX_X+3;
     tm_color = 0x07;
     tm_printf(menu_opts,
-              OPT_COLOR(boot_options&BOOT_VERBOSE));
+              OPT_FMT(boot_options&OPT_VERBOSE));
 
     tm_cursor_set(0, 24);
     tm_color = 0x07;
 }
 
-void timer_test(struct int_regs *r) {
-    /* will print approximately once every second */
-    /* (runs at 18.222 Hz) */
-    /* if(ticks++ % 18 == 0) */
-    /*     tm_puts("tick"); */
-
+/* NOTE: runs at 18.222 Hz by default */
+void timer_handler(struct int_regs *r) {
     ++ticks;
+}
+
+/* NOTE: ignores SCAN_EXTENDED */
+void kb_handler(struct int_regs *r) {
+    uint8_t sc;
+
+    sc = inb(0x60);
+    tm_cursor_set(0, 24);
+    tm_color = 0x07;
+
+    /* if key is released */
+    if(sc&0x80) return;
+    /* disable autoboot on any key press (not just space) */
+    autoboot = 0;
+
+    if(menu_current == 0) {
+        /* main menu */
+        switch(sc) {
+        /* Boot ShitOS */
+        case SCAN1_1: case SCAN1_B: case SCAN1_ENTER:
+            tm_puts("Boot NYI  ");
+            return;
+
+        /* Escape to loader prompt */
+        case SCAN1_2: case SCAN1_ESCAPE:
+            tm_puts("Prompt NYI");
+            return;
+
+        /* Reboot */
+        case SCAN1_3: case SCAN1_R:
+            tm_puts("Reboot NYI");
+            return;
+
+        /* Boot Options */
+        case SCAN1_4: case SCAN1_O:
+            menu_current = 1;
+            break;
+        }
+    } else {
+        /* options menu */
+        switch(sc) {
+        /* Back to main menu */
+        case SCAN1_1: case SCAN1_BACKSPACE:
+            menu_current = 0;
+            break;
+
+        /* Load System Defaults */
+        case SCAN1_2: case SCAN1_D:
+            boot_options = boot_options_default;
+            break;
+
+        /* Boot Options: Verbose */
+        case SCAN1_3: case SCAN1_V:
+            boot_options ^= OPT_VERBOSE;
+            break;
+        }
+    }
+
+    /* redraw menu */
+    if(menu_current == 0) draw_menu_main();
+    else                  draw_menu_opts();
 }
 
 /* bootloader main */
@@ -144,7 +219,8 @@ void bmain(void *esp) {
     irq_install();
     isrs_install();
 
-    irq_handler_install(0, timer_test);
+    irq_handler_install(0, timer_handler);
+    irq_handler_install(1, kb_handler);
 
     asm("sti");
 
@@ -152,32 +228,23 @@ void bmain(void *esp) {
     draw_menu_main();
 
     uint32_t start = ticks, dt = 0;
-    while(dt < 18*9) {
+    while(autoboot) {
         dt = ticks - start;
         tm_cursor_set(2, MENU_BOX_Y+MENU_BOX_H+2);
-        tm_printf("Autoboot in %u seconds. %H0f[Space]%H07 to pause",
-                  9 - (dt / 18));
+        tm_printf("Autoboot in %u seconds. %H0f[Space]%H07 to pause ",
+                  AUTOBOOT_TIMEOUT - (dt / TPS));
 
-        if(dt % 36) continue;
-
-        /* I have no idea why this causes the cursor to appear but it does */
-        draw_menu_clear();
-        switch(menu_current) {
-        case 0:
-            draw_menu_main();
-            menu_current = 1;
-            break;
-        case 1:
-            boot_options = !boot_options;
-            draw_menu_opts();
-            menu_current = 0;
+        if(dt >= AUTOBOOT_TIMEOUT*TPS) {
+            /* TODO: actually boot */
+            tm_cursor_set(0, 23);
+            tm_color = 0x07;
+            tm_puts("Autoboot...");
             break;
         }
     }
-    /* tm_cursor_set(2, MENU_BOX_Y+MENU_BOX_H+2); */
-    /* for(uint8_t i = 0; i<39; ++i) tm_putc(' '); */
-
-    /* proceed to autoboot */
+    /* should only break if autoboot == 0 */
+    tm_cursor_set(2, MENU_BOX_Y+MENU_BOX_H+2);
+    for(uint8_t i = 0; i<39; ++i) tm_putc(' ');
 
     for(;;) asm("hlt");
 }

@@ -1,0 +1,51 @@
+#ifndef SCAN_CODE_H_
+#define SCAN_CODE_H_
+
+/* NOTE: not a complete set, only includes common ones used by stage2 */
+#define SCAN_RELEASED   (0x80)
+#define SCAN_EXTENDED   (0xe0)
+
+#define SCAN1_ESCAPE    (0x01)
+#define SCAN1_1         (0x02)
+#define SCAN1_2         (0x03)
+#define SCAN1_3         (0x04)
+#define SCAN1_4         (0x05)
+#define SCAN1_5         (0x06)
+#define SCAN1_6         (0x07)
+#define SCAN1_7         (0x08)
+#define SCAN1_8         (0x09)
+#define SCAN1_9         (0x0a)
+#define SCAN1_0         (0x0b)
+
+#define SCAN1_ENTER     (0x1c)
+#define SCAN1_BACKSPACE (0x0e)
+#define SCAN1_SPACE     (0x39)
+
+#define SCAN1_A         (0x1e)
+#define SCAN1_B         (0x30)
+#define SCAN1_C         (0x30)
+#define SCAN1_D         (0x20)
+#define SCAN1_E         (0x12)
+#define SCAN1_F         (0x21)
+#define SCAN1_G         (0x22)
+#define SCAN1_H         (0x23)
+#define SCAN1_I         (0x17)
+#define SCAN1_J         (0x24)
+#define SCAN1_K         (0x25)
+#define SCAN1_L         (0x26)
+#define SCAN1_M         (0x32)
+#define SCAN1_N         (0x31)
+#define SCAN1_O         (0x18)
+#define SCAN1_P         (0x19)
+#define SCAN1_Q         (0x10)
+#define SCAN1_R         (0x13)
+#define SCAN1_S         (0x1f)
+#define SCAN1_T         (0x14)
+#define SCAN1_U         (0x16)
+#define SCAN1_V         (0x2f)
+#define SCAN1_W         (0x11)
+#define SCAN1_X         (0x2d)
+#define SCAN1_Y         (0x15)
+#define SCAN1_Z         (0x2c)
+
+#endif // SCAN_CODE_H_
