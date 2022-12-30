@@ -6,11 +6,18 @@
 
 static uint16_t *tm_memory = (uint16_t *)0xb8000;
 uint16_t tm_cursor = 0;
+uint8_t tm_line_reset = 0;
 uint8_t tm_color = 0x0f;
 static unsigned char alphanum[] = {
     '0', '1', '2', '3', '4', '5', '6', '7',
     '8', '9', 'a', 'b', 'c', 'd', 'e', 'f',
 };
+
+inline uint8_t chtoi(char c) {
+    return c >= 'a'
+         ? c - 'a' + 0xa
+         : c - '0';
+}
 
 void tm_cursor_set(uint8_t x, uint8_t y) {
     tm_cursor = x + TM_WIDTH*y;
@@ -18,10 +25,10 @@ void tm_cursor_set(uint8_t x, uint8_t y) {
 
 void tm_cursor_update(void) {
     /* update blinking cursor */
-    outb(0x03d4, 14);
-    outb(0x03d5, tm_cursor>>8);
-    outb(0x03d4, 15);
-    outb(0x03d5, tm_cursor & 0xff);
+    /* outb(0x03d4, 14); */
+    /* outb(0x03d5, tm_cursor>>8); */
+    /* outb(0x03d4, 15); */
+    /* outb(0x03d5, tm_cursor & 0xff); */
 }
 
 void tm_putc(unsigned char c) {
@@ -43,7 +50,7 @@ void tm_putc(unsigned char c) {
         case '\n':
             ++y;
         case '\r':
-            x = 0;
+            x = tm_line_reset;
             break;
         }
 
@@ -101,6 +108,15 @@ void tm_printf(const char *__restrict fmt, ...) {
                 while(u /= 16);
                 while(s-- >= buf)
                     tm_putc(*s);
+                continue;
+
+            case 'h':
+                tm_color = va_arg(ap, unsigned int);
+                continue;
+
+            case 'H':
+                tm_color = chtoi(*fmt++)<<4;
+                tm_color |= chtoi(*fmt++);
                 continue;
 
             case '%':

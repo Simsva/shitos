@@ -7,6 +7,7 @@
 #define TM_HEIGHT (25)
 
 extern uint16_t tm_cursor;
+extern uint8_t tm_line_reset;
 extern uint8_t tm_color;
 
 void tm_cursor_set(uint8_t x, uint8_t y);
