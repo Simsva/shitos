@@ -29,7 +29,7 @@
 
 
 /* timer */
-#define TPS          18    /* 18.222 ~= 18 */
+#define TPS              18    /* 18.222 ~= 18 */
 #define AUTOBOOT_TIMEOUT 10
 
 void *global_esp;
@@ -143,6 +143,22 @@ void draw_menu_opts(void) {
     tm_color = 0x07;
 }
 
+/* pulses the CPU's RESET pin through the keyboard controller */
+void reboot(void) {
+    uint8_t temp;
+
+    asm("cli");
+
+    /* wait for keyboard buffers to be empty */
+    do {
+      temp = inb(0x64);
+    } while(temp & 0x02);
+
+    /* pulse CPU RESET pin */
+    outb(0x64, 0xfe);
+    for(;;) asm("hlt");
+}
+
 /* NOTE: runs at 18.222 Hz by default */
 void timer_handler(struct int_regs *r) {
     ++ticks;
@@ -176,7 +192,7 @@ void kb_handler(struct int_regs *r) {
 
         /* Reboot */
         case SCAN1_3: case SCAN1_R:
-            tm_puts("Reboot NYI");
+            reboot();
             return;
 
         /* Boot Options */
@@ -244,7 +260,7 @@ void bmain(void *esp) {
     }
     /* should only break if autoboot == 0 */
     tm_cursor_set(2, MENU_BOX_Y+MENU_BOX_H+2);
-    for(uint8_t i = 0; i<39; ++i) tm_putc(' ');
+    for(uint8_t i = 0; i<40; ++i) tm_putc(' ');
 
     for(;;) asm("hlt");
 }

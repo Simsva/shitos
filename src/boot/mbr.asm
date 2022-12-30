@@ -1,17 +1,26 @@
 [bits 16]
 ;; cpu 8086
 
-    %define PRT_OFF 0x1be
+    ;; Memory locations
+    %define BDA_BOOT 0x472      ; boot howto flag
+    %define PRT_OFF 0x1be       ; partition tabble offset
+
+    ;; Partitions
+    %define PRT_NUM 4           ; number of partitions
 
 section .text
 
-_fakestart:
+global _start
+_start:
     cli
 
     call _realstart
 _realstart:
     pop si                                   ; Pop ret addr (*_realstart)
-    lea si, [si - (_realstart - _fakestart)] ; *_fakestart
+    lea si, [si - (_realstart - _start)]     ; *_start
+
+    push cs
+    pop ds
 
     xor ax, ax
     mov ss, ax
@@ -24,7 +33,7 @@ _realstart:
     mov cx, 0x100
     rep movsw
 
-    mov cl, (_highstart - _fakestart)
+    mov cl, (_highstart - _start)
     push es
     push cx
     retf                        ; Return far to es:cx (*_highstart)
@@ -32,15 +41,15 @@ _realstart:
 _highstart:
     push cs
     pop ds
-    mov si, 446                 ; partitions offset
-    mov cl, 4
+    mov si, PRT_OFF
+    mov cl, PRT_NUM
 .loop:
     test BYTE [si], 0x80
     jnz load
     add si, 16
     loop .loop
-    mov si, str_nobootable
-    jmp print
+    mov si, msg_nobootable
+    jmp error
 
 load:
     mov ax, 0x07c0
@@ -49,9 +58,9 @@ load:
     mov ax, [si+8]
     mov dx, [si+10]
     call read_sector
-    mov si, str_notfound
+    mov si, msg_notfound
     cmp WORD [es:0x1fe], 0xaa55
-    jne print
+    jne error
     mov dx, bx
     jmp 0:0x7c00
 
@@ -128,25 +137,33 @@ read_sector:
     ret
 
 disk_error:
-    mov si, str_diskerror
-print:
-    mov bx, 0x0001
-    mov ah, 0x0e
+    mov si, msg_diskerror
+error:
+    call puts
+    xor ah, ah                    ; Wait for
+    int 0x16                      ;  keystroke
+    mov DWORD [BDA_BOOT], 0x1234  ; Do a
+    jmp 0xf000:0xfff0             ;  warm reboot
 
+puts.0:
+    mov bx, 0x7
+    mov ah, 0xe
+    int 0x10
+puts:
     lodsb
+    test al, al
+    jne .0
 
-    cmp al, 0
-    je seppuku
+    ;; Error return
+eret:
+    mov ah, 0x1
+    stc
+ret:
+    ret
 
-    int 10h
-    jmp print
-seppuku:
-    hlt
-    jmp seppuku
-
-str_nobootable: db "no bootable partition found",0
-str_notfound:   db "hejhej",0
-str_diskerror:  db "disk error",0
+msg_nobootable: db "no bootable partition found",0
+msg_notfound:   db "active partition has no valid boot signature",0
+msg_diskerror:  db "disk error",0
 
     ;; INT 13h packet
 disk_packet:

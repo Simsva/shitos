@@ -26,37 +26,9 @@ _start:
     mov es, ax
     mov fs, ax
     mov gs, ax
-    ;; mov ss, ax
+    mov ss, ax
 
     jmp 0x8:_entry32
-
-;; error:
-;;     call puts
-;;     mov si, msg_error
-;;     call puts
-;;     xor ah, ah                    ; Wait for
-;;     int 0x16                      ;  keystroke
-;;     mov DWORD [BDA_BOOT], 0x1234  ; Do a
-;;     jmp 0xf000:0xfff0             ;  warm reboot
-
-;; puts.0:
-;;     mov bx, 0x7
-;;     mov ah, 0xe
-;;     int 0x10
-;; puts:
-;;     lodsb
-;;     test al, al
-;;     jne .0
-
-;;     ;; Error return
-;; eret:
-;;     mov ah, 0x1
-;;     stc
-;; ret:
-;;     ret
-
-;; msg_stage2: db "stage2 woohoo",0
-;; msg_error:  db " error",0xd,0xa,0
 
     ;; IDT
 align 16
@@ -85,7 +57,7 @@ gdt_data_segment:
     dw 0xffff
     dw 0x0000
     db 0x00
-    db 0b10011010
+    db 0b10010010
     db 0b11001111
     db 0x00
 gdt_end:
