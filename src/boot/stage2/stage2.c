@@ -5,6 +5,7 @@
 #include "io.h"
 #include "tm_io.h"
 #include "scan_code.h"
+#include "v86.h"
 
 #ifndef asm
 # define asm __asm__ volatile
@@ -27,18 +28,31 @@
 /* boot options */
 #define OPT_VERBOSE  0x1
 
-
 /* timer */
 #define TPS              18    /* 18.222 ~= 18 */
 #define AUTOBOOT_TIMEOUT 10
 
+/* forward declarations */
+void draw_menu_skeleton(void);
+void draw_menu_clear(void);
+void draw_menu_main(void);
+void draw_menu_opts(void);
+
+void timer_handler(struct int_regs *);
+void kb_handler(struct int_regs *);
+
+void reboot(void);
+void boot(void);
+
+/* global vars */
 void *global_esp;
 
 uint32_t ticks = 0;
 uint8_t menu_current = 0; /* 0 for main, 1 for options */
 uint8_t boot_options_default = 0x0,
         boot_options = 0x0;
-uint8_t autoboot = 1; /* set to 0 to stop autoboot */
+uint8_t autoboot = 1, /* set to 0 to stop autoboot */
+        booting = 0;  /* is currently booting */
 
 const char *brand = "\
   _____  _      _  _     ____    _____\n\
@@ -143,22 +157,6 @@ void draw_menu_opts(void) {
     tm_color = 0x07;
 }
 
-/* pulses the CPU's RESET pin through the keyboard controller */
-void reboot(void) {
-    uint8_t temp;
-
-    asm("cli");
-
-    /* wait for keyboard buffers to be empty */
-    do {
-      temp = inb(0x64);
-    } while(temp & 0x02);
-
-    /* pulse CPU RESET pin */
-    outb(0x64, 0xfe);
-    for(;;) asm("hlt");
-}
-
 /* NOTE: runs at 18.222 Hz by default */
 void timer_handler(struct int_regs *r) {
     ++ticks;
@@ -167,10 +165,11 @@ void timer_handler(struct int_regs *r) {
 /* NOTE: ignores SCAN_EXTENDED */
 void kb_handler(struct int_regs *r) {
     uint8_t sc;
+    uint16_t cursor;
 
+    /* save cursor */
+    cursor = tm_cursor;
     sc = inb(0x60);
-    tm_cursor_set(0, 24);
-    tm_color = 0x07;
 
     /* if key is released */
     if(sc&0x80) return;
@@ -182,18 +181,23 @@ void kb_handler(struct int_regs *r) {
         switch(sc) {
         /* Boot ShitOS */
         case SCAN1_1: case SCAN1_B: case SCAN1_ENTER:
-            tm_puts("Boot NYI  ");
+            /* skip autoboot timer and continue booting */
+            booting = 1;
             return;
 
         /* Escape to loader prompt */
         case SCAN1_2: case SCAN1_ESCAPE:
+            tm_cursor_set(0, 23);
+            tm_color = 0x07;
             tm_puts("Prompt NYI");
+
+            /* restore cursor */
+            tm_cursor = cursor;
             return;
 
         /* Reboot */
         case SCAN1_3: case SCAN1_R:
             reboot();
-            return;
 
         /* Boot Options */
         case SCAN1_4: case SCAN1_O:
@@ -223,6 +227,46 @@ void kb_handler(struct int_regs *r) {
     /* redraw menu */
     if(menu_current == 0) draw_menu_main();
     else                  draw_menu_opts();
+
+    /* restore cursor */
+    tm_cursor = cursor;
+}
+
+/* pulses the CPU's RESET pin through the keyboard controller */
+void reboot(void) {
+    uint8_t temp;
+
+    asm("cli");
+
+    /* wait for keyboard buffers to be empty */
+    do {
+      temp = inb(0x64);
+    } while(temp & 0x02);
+
+    /* pulse CPU RESET pin */
+    outb(0x64, 0xfe);
+    for(;;) asm("hlt");
+}
+
+void boot(void) {
+    /* uninstall keyboard handler */
+    irq_handler_uninstall(1);
+
+    tm_cursor_set(0, 24);
+    tm_line_reset = 0;
+    tm_color = 0x07;
+    tm_puts("Booting...");
+
+    /* NOTE: only for testing v86, will remove later */
+    v86.ctl = 0;
+    v86.addr = 0x10;
+    v86.eax = 0x0013;
+    v86int();
+
+    for(uint16_t i = 0; i < 320*200; ++i)
+        ((uint8_t *)0xa0000)[i] = i/320;
+
+    for(;;) asm("hlt");
 }
 
 /* bootloader main */
@@ -251,16 +295,14 @@ void bmain(void *esp) {
                   AUTOBOOT_TIMEOUT - (dt / TPS));
 
         if(dt >= AUTOBOOT_TIMEOUT*TPS) {
-            /* TODO: actually boot */
-            tm_cursor_set(0, 23);
-            tm_color = 0x07;
-            tm_puts("Autoboot...");
+            booting = 1;
             break;
         }
     }
-    /* should only break if autoboot == 0 */
     tm_cursor_set(2, MENU_BOX_Y+MENU_BOX_H+2);
     for(uint8_t i = 0; i<40; ++i) tm_putc(' ');
 
-    for(;;) asm("hlt");
+    while(!booting) asm("hlt");
+
+    boot();
 }

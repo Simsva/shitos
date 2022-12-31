@@ -24,6 +24,7 @@ _start:
     jmp _realstart
     nop
 
+    ;; FIXME: why is there a BPB if this is not a FAT partition anymore?
                  db 'SHTOS1.0'
                  dw 512
 bpb_spercluster: db 2

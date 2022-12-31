@@ -1,5 +1,7 @@
 # Build files
 bin/
+partitions/
+working/
 *.o
 *.bin
 *.iso

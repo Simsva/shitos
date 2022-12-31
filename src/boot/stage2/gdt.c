@@ -26,11 +26,35 @@ void gdt_install(void) {
 
     _gdt_set_gate(0, 0, 0, 0, 0);
 
+    /* access
+     * bit  7  : present
+     * bits 6-5: descriptor privilege level (ring)
+     * bit  4  : type (0 is system segment, 1 is code or data segment)
+     * bit  3  : executable
+     * bit  2  : direction/conforming
+     *           for data segment: 0 grows up, 1 grows down
+     *           for code segment: 0 only executable from ring (bits 6-5)
+     *                             1 executable from equal or lower ring
+     * bit  1  : readable (for code segment) or writable (for data segment)
+     * bit  0  : accessed (leave cleared)
+     */
+
+    /* flags
+     * bit 7  : granularity flag, 0 means limit is in bytes
+     *                            1 means it is in 4 KiB blocks (pages)
+     * bit 6  : size flag, 0 for 16-bit and 1 for 32-bit
+     * bit 5  : long-mode code flag, 64-bit if set (when set leave bit 6 cleared)
+     * bit 4  : reserved
+     * bit 3-0: part of limit, ignored by _gdt_set_gate
+     */
+
     /* ring 0 CS and DS */
-    /* bit 7: present, 6-5: ring, 4: type, 3: executable, 2: directin/conforming
-     * 1: readable/writable, 0: accessed (set 0) */
-    _gdt_set_gate(1, 0, UINT32_MAX, 0x9a /* 10011010 */, 0xcf);
-    _gdt_set_gate(2, 0, UINT32_MAX, 0x92 /* 10010010 */, 0xcf);
+    _gdt_set_gate(1, 0, UINT32_MAX, 0x9a /* 1001 1010 */, 0xc0 /* 1100 0000 */);
+    _gdt_set_gate(2, 0, UINT32_MAX, 0x92 /* 1001 0010 */, 0xc0 /* 1100 0000 */);
+
+    /* v86 real mode CS and DS */
+    _gdt_set_gate(3, 0, UINT16_MAX, 0x9a /* 1001 1010 */, 0x00 /* 0000 0000 */);
+    _gdt_set_gate(4, 0, UINT16_MAX, 0x92 /* 1001 0010 */, 0x00 /* 0000 0000 */);
 
     /* NOTE: the bootloader runs completely in ring 0 */
 

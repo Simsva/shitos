@@ -59,7 +59,11 @@ void tm_putc(unsigned char c) {
         tm_memory[tm_cursor++] = c | (tm_color<<8);
     }
 
-    tm_cursor %= TM_WIDTH*TM_HEIGHT;
+    if(tm_cursor >= TM_WIDTH*TM_HEIGHT) {
+        tm_scroll();
+        tm_cursor -= TM_WIDTH;
+    }
+    /* tm_cursor %= TM_WIDTH*TM_HEIGHT; */
     tm_cursor_update();
 }
 
@@ -135,6 +139,13 @@ void tm_clear(void) {
     memset(tm_memory, 0, sizeof(tm_memory[0]) * TM_WIDTH*TM_HEIGHT);
     tm_cursor = 0;
     tm_cursor_update();
+}
+
+void tm_scroll(void) {
+    memcpy(tm_memory, tm_memory + TM_WIDTH,
+           (TM_HEIGHT-1)*TM_WIDTH*sizeof(tm_memory[0]));
+    memset(tm_memory+(TM_HEIGHT-1)*TM_WIDTH, 0,
+           TM_WIDTH*sizeof(tm_memory[0]));
 }
 
 void tm_init(void) {

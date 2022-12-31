@@ -32,11 +32,13 @@ STRUCTS_OBJ=$(STRUCTS_SRC:.c=.o)
 
 # output files
 DEBUG=$(MBR:.bin=.elf) $(STAGE1:.bin=.elf) $(STAGE2:.bin=.elf) $(STRUCTS_OBJ)
-DIRS=bin
+DIRS=bin partitions working
+BUILDFILES=./bin/* $(MBR_OBJ) $(STAGE1_OBJ) $(STAGE2_OBJ) $(STRUCTS_OBJ)
+BUILDFILES+=$(BOOTPART) $(FATPART) $(FATPART).tmp $(ISO)
 
 ISO=shitos.iso
-BOOTPART=bin/bootpart.bin
-FATPART=bin/fatpart.bin
+BOOTPART=partitions/bootpart.img
+FATPART=partitions/fatpart.img
 FATPARTSZ=128k
 
 
@@ -45,10 +47,10 @@ all: bin $(MBR) $(STAGE1) $(STAGE2) $(BOOTPART) $(FATPART)
 
 clean:
 	@echo Clean
-	rm -f ./bin/* $(MBR_OBJ) $(STAGE1_OBJ) $(STAGE2_OBJ) $(STRUCTS_OBJ) $(BOOTPART) $(FATPART) $(ISO)
+	rm -f $(BUILDFILES)
 
 
-# hack to allow C and ASM files with the same name
+# HACK: allow C and ASM files with the same basename
 %_c.o: %.c
 	@echo "CC	$@"
 	@$(CC) -o $@ -c $< $(CFLAGS)
@@ -59,8 +61,9 @@ clean:
 	@$(AS) -o $@ $< $(ASFLAGS)
 
 
-# NOTE: some targetrs depend on `bin` but does not list it as a prerequisite,
-# so make sure to run `make bin` once manually in case of issues
+# NOTE: some targets depend on `dirs` but do not list it as a prerequisite,
+# so make sure to run `make dirs` once manually in case of issues
+dirs: $(DIRS)
 $(DIRS):
 	@echo "MKDIR	$@"
 	@mkdir -p $@
@@ -93,7 +96,8 @@ $(STAGE2): $(STAGE2_OBJ)
 # used for debugging
 $(STAGE2:.bin=.elf): $(STAGE2_OBJ)
 	@echo "LD	$(STAGE2:.bin=.elf)"
-	@$(LD) -o $(STAGE2:.bin=.elf) $^ $(LDFLAGS) -T$(STAGE2_LD) --oformat=elf32-i386
+	@$(LD) -o $(STAGE2:.bin=.elf) $^ $(LDFLAGS) -T$(STAGE2_LD) \
+		--oformat=elf32-i386
 
 
 # only used in GDB
@@ -104,28 +108,38 @@ $(STRUCTS_OBJ): $(STRUCTS_SRC)
 
 
 # create "bootloader partition"
-$(BOOTPART): $(STAGE1) $(STAGE2)
+$(BOOTPART): partitions $(STAGE1) $(STAGE2)
 	@echo "PART	$(BOOTPART)"
 	@cat $(STAGE1) $(STAGE2) > $(BOOTPART)
 
 
 # create fat partition
-# TODO: mount fs and do things
-$(FATPART):
+$(FATPART): working partitions
 	@echo "PART	$(FATPART)	$(FATPARTSZ) sectors"
-	@dd if=/dev/zero of=$(FATPART) bs=512 count=$(FATPARTSZ) >/dev/null 2>&1
-	@mkfs.vfat -F32 $(FATPART) >/dev/null
+	@rm $(FATPART).tmp 2>/dev/null || echo jank >/dev/null
+	@dd if=/dev/zero of=$(FATPART).tmp bs=512 count=$(FATPARTSZ) \
+		>/dev/null 2>&1
+	@mkfs.vfat -F32 $(FATPART).tmp >/dev/null
+# TODO: mount fs and do things
+#	@mount -tvfat -oloop $(FATPART).tmp ./working/ >/dev/null
+#	@echo "hello world" > ./working/shitos.elf
+#	@umount ./working/
+	@mv $(FATPART).tmp $(FATPART)
+# HACK: touch output file to stop rebuilds due to `working` being newer
+	@touch $(FATPART)
 
 
 debug: bin $(DEBUG)
 
 
 # partition and combine to disk image
-# NOTE: for some reason debug causes rebuilds of iso, so run `make debug iso`
-# instead of `make iso debug` when using both targets
+# HACK: debug causes rebuilds of iso due to modifying `bin`, so run
+# `make debug iso` instead of `make iso debug` when using both targets
 iso: $(ISO)
 $(ISO): bin $(MBR) $(BOOTPART) $(FATPART)
 	@echo "ISO	partition.sh"
-	@./partition.sh -vfm "$(MBR)" "$(ISO)" "$(BOOTPART):13::y" "$(FATPART):0b"
+	@rm $(ISO) 2>/dev/null || echo jank >/dev/null
+	@./partition.sh -vfm "$(MBR)" "$(ISO)" \
+		"$(BOOTPART):13::y" "$(FATPART):0b"
 
 .PHONY: clean debug structs mbr stage1 stage2 iso

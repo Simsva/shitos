@@ -2,6 +2,7 @@
 
 #include "idt.h"
 #include "tm_io.h"
+#include "v86.h"
 
 extern void _isr00(void);
 extern void _isr01(void);
@@ -35,6 +36,8 @@ extern void _isr1c(void);
 extern void _isr1d(void);
 extern void _isr1e(void);
 extern void _isr1f(void);
+
+extern void _isr_v86(void);
 extern void _isr80(void);
 
 void isrs_install(void) {
@@ -72,6 +75,9 @@ void isrs_install(void) {
     _idt_set_gate(0x1d, (uint32_t)_isr1d, 0x08, 0x8e);
     _idt_set_gate(0x1e, (uint32_t)_isr1e, 0x08, 0x8e);
     _idt_set_gate(0x1f, (uint32_t)_isr1f, 0x08, 0x8e);
+
+    /* virtual 8086 interrupt */
+    _idt_set_gate(INT_V86, (uint32_t)_isr_v86, 0x08, 0x8e);
 
     /* NOTE: only for testing */
     _idt_set_gate(0x80, (uint32_t)_isr80, 0x08, 0x8e);
