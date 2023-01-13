@@ -4,7 +4,7 @@ typedef unsigned short     uint16_t;
 typedef unsigned int       uint32_t;
 typedef unsigned long long uint64_t;
 
-struct disk_packet_t {
+struct disk_packet {
     uint8_t size, reserved;
     uint16_t num_blocks, offset, segment;
     uint64_t lba;

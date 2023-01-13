@@ -17,6 +17,15 @@ static inline void *memcpy(void *__restrict dst, const void *__restrict src, siz
     return d;
 }
 
-/* TODO: memmove, memcmp */
+static inline int memcmp(const void *vl, const void *vr, size_t n) {
+    const uint8_t *l=vl, *r=vr;
+    for (; n && *l == *r; n--, l++, r++);
+    return n ? *l-*r : 0;
+}
+
+static inline int strcmp(const char *l, const char *r) {
+    for (; *l == *r && *l; l++, r++);
+    return *(unsigned char *)l - *(unsigned char *)r;
+}
 
 #endif // STRING_H_

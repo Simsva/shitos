@@ -5,7 +5,7 @@
 #include "io.h"
 #include "tm_io.h"
 #include "scan_code.h"
-#include "v86.h"
+#include "partition.h"
 
 #ifndef asm
 # define asm __asm__ volatile
@@ -25,8 +25,11 @@
 #define OPT_COLOR_OFF 0x0c
 #define OPT_FMT(x)    ((x) ? OPT_COLOR_ON : OPT_COLOR_OFF),\
                       ((x) ? menu_opt_on  : menu_opt_off)
+#define HAS_OPT(x)    (boot_options&x)
+
 /* boot options */
-#define OPT_VERBOSE  0x1
+#define OPTS_DEFAULT 0x01
+#define OPT_VERBOSE  0x01
 
 /* timer */
 #define TPS              18    /* 18.222 ~= 18 */
@@ -49,8 +52,7 @@ void *global_esp;
 
 uint32_t ticks = 0;
 uint8_t menu_current = 0; /* 0 for main, 1 for options */
-uint8_t boot_options_default = 0x0,
-        boot_options = 0x0;
+uint8_t boot_options = OPTS_DEFAULT;
 uint8_t autoboot = 1, /* set to 0 to stop autoboot */
         booting = 0;  /* is currently booting */
 
@@ -214,7 +216,7 @@ void kb_handler(struct int_regs *r) {
 
         /* Load System Defaults */
         case SCAN1_2: case SCAN1_D:
-            boot_options = boot_options_default;
+            boot_options = OPTS_DEFAULT;
             break;
 
         /* Boot Options: Verbose */
@@ -249,6 +251,12 @@ void reboot(void) {
 }
 
 void boot(void) {
+    struct partition_entry *parts =
+        (struct partition_entry *)(MEM_MBR+0x1be);
+    uint8_t drive_num = *((uint8_t *)MEM_DRV);
+    uint8_t i;
+    int8_t err;
+
     /* uninstall keyboard handler */
     irq_handler_uninstall(1);
 
@@ -258,14 +266,43 @@ void boot(void) {
     tm_puts("Booting...");
 
     /* NOTE: only for testing v86, will remove later */
-    v86.ctl = 0;
-    v86.addr = 0x10;
-    v86.eax = 0x0013;
-    v86int();
+    /* v86.ctl = 0; */
+    /* v86.addr = 0x10; */
+    /* v86.eax = 0x0013; */
+    /* v86int(); */
 
-    for(uint16_t i = 0; i < 320*200; ++i)
-        ((uint8_t *)0xa0000)[i] = i/320;
+    /* for(uint16_t i = 0; i < 320*200; ++i) */
+    /*     ((uint8_t *)0xa0000)[i] = i/320; */
 
+    /* TODO: move all this to before rendering the menu */
+
+    /* read MBR at 0x300 */
+    xread(0, 0, MEM_MBR, drive_num, 1);
+
+    if(HAS_OPT(OPT_VERBOSE))
+        tm_printf("hacker? %x\n", *((uint16_t *)(MEM_MBR+0x1fe)));
+    for(i = 0; i < 4; ++i) {
+        if(HAS_OPT(OPT_VERBOSE))
+            tm_printf("boot:%x type:%x lba:%u\n",
+                    parts[i].boot, parts[i].type, parts[i].start_lba);
+        if(parts[i].type != 0x83) continue;
+
+        err = partition_ext2_parse(parts+i, drive_num);
+        switch(err) {
+        case PARSE_EXT2_SUCCESS:
+            tm_puts("Success");
+            goto found;
+
+        case PARSE_EXT2_NOTEXT2:
+            tm_puts("Not an EXT2 partition");
+            break;
+        }
+    }
+    tm_puts("No EXT2 partition found");
+    for(;;) asm("hlt");
+
+    /* TODO: load kernel */
+found:
     for(;;) asm("hlt");
 }
 

@@ -114,6 +114,16 @@ void tm_printf(const char *__restrict fmt, ...) {
                     tm_putc(*s);
                 continue;
 
+            case 'o':
+                u = va_arg(ap, unsigned int);
+                s = buf;
+                do
+                    *s++ = '0' + u%8;
+                while(u /= 8);
+                while(--s >= buf)
+                    tm_putc(*s);
+                continue;
+
             case 'h':
                 tm_color = va_arg(ap, unsigned int);
                 continue;

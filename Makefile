@@ -40,6 +40,8 @@ ISO=shitos.iso
 BOOTPART=partitions/bootpart.img
 FATPART=partitions/fatpart.img
 FATPARTSZ=128k
+EXTPART=partitions/extpart.img
+EXTPARTSZ=128k
 
 
 all: bin $(MBR) $(STAGE1) $(STAGE2) $(BOOTPART) $(FATPART)
@@ -129,6 +131,26 @@ $(FATPART): working partitions
 	@touch $(FATPART)
 
 
+$(EXTPART): working partitions bin/shitos.elf
+	@echo "PART	$(EXTPART)	$(EXTPARTSZ) sectors"
+	@rm $(EXTPART).tmp 2>/dev/null || echo jank >/dev/null
+	@dd if=/dev/zero of=$(EXTPART).tmp bs=512 count=$(EXTPARTSZ) \
+		>/dev/null 2>&1
+	@mkfs.ext2 -b4096 $(EXTPART).tmp >/dev/null
+
+	@mount -text2 -oloop $(EXTPART).tmp ./working/ >/dev/null
+	@install ./bin/shitos.elf ./working/shitos.elf
+	@umount ./working/
+	@mv $(EXTPART).tmp $(EXTPART)
+# HACK: touch output file to stop rebuilds due to `working` being newer
+	@touch $(EXTPART)
+
+
+# NOTE: temporary
+bin/shitos.elf:
+	@echo "dskhfdskfjh world" > $@
+
+
 debug: bin $(DEBUG)
 
 
@@ -136,10 +158,10 @@ debug: bin $(DEBUG)
 # HACK: debug causes rebuilds of iso due to modifying `bin`, so run
 # `make debug iso` instead of `make iso debug` when using both targets
 iso: $(ISO)
-$(ISO): bin $(MBR) $(BOOTPART) $(FATPART)
+$(ISO): bin $(MBR) $(BOOTPART) $(EXTPART)
 	@echo "ISO	partition.sh"
 	@rm $(ISO) 2>/dev/null || echo jank >/dev/null
 	@./partition.sh -vfm "$(MBR)" "$(ISO)" \
-		"$(BOOTPART):13::y" "$(FATPART):0b"
+		"$(BOOTPART):13::y" "$(EXTPART):linux"
 
 .PHONY: clean debug structs mbr stage1 stage2 iso

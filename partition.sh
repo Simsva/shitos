@@ -34,7 +34,7 @@ does not have read access"
 
   # FIXME: assumes a block size of 512
   tmp_sect=0
-  [ "$part_file" ] && tmp_sect="$(stat -c %b "$part_file")"
+  [ "$part_file" ] && tmp_sect="$((($(stat -c %s "$part_file")+511) / 512))"
   [ "$part_sect" -lt "$tmp_sect" ] && part_sect="$tmp_sect"
 
   [ "$part_boot" ] && part_boot="*"

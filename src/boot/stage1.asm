@@ -76,7 +76,7 @@ xread:
     mov bp, sp
     call read
     lea sp, [bp + 0x10]
-    ret
+    retf
 
 _realstart:
     cld                         ; String ops inc
@@ -149,7 +149,7 @@ nread:
     mov bx, MEM_BUF
     mov ax, [si + 0x8]
     mov cx, [si + 0xa]
-    call xread.1
+    call 0:xread.1
     jnc ret
     mov si, msg_read
 
