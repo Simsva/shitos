@@ -7,6 +7,8 @@
 #include "scan_code.h"
 #include "partition.h"
 
+#include "boot_opts.h"
+
 #ifndef asm
 # define asm __asm__ volatile
 #endif
@@ -25,11 +27,6 @@
 #define OPT_COLOR_OFF 0x0c
 #define OPT_FMT(x)    ((x) ? OPT_COLOR_ON : OPT_COLOR_OFF),\
                       ((x) ? menu_opt_on  : menu_opt_off)
-#define HAS_OPT(x)    (boot_options&x)
-
-/* boot options */
-#define OPTS_DEFAULT 0x01
-#define OPT_VERBOSE  0x01
 
 /* timer */
 #define TPS              18    /* 18.222 ~= 18 */
@@ -265,26 +262,19 @@ void boot(void) {
     tm_color = 0x07;
     tm_puts("Booting...");
 
-    /* NOTE: only for testing v86, will remove later */
-    /* v86.ctl = 0; */
-    /* v86.addr = 0x10; */
-    /* v86.eax = 0x0013; */
-    /* v86int(); */
-
-    /* for(uint16_t i = 0; i < 320*200; ++i) */
-    /*     ((uint8_t *)0xa0000)[i] = i/320; */
-
-    /* TODO: move all this to before rendering the menu */
+    /* TODO: move all this to before rendering the menu? */
 
     /* read MBR at 0x300 */
     xread(0, 0, MEM_MBR, drive_num, 1);
+    if(*((uint16_t *)(MEM_MBR+0x1fe)) != 0xaa55) {
+        tm_color = 0x4f;
+        tm_puts("Invalid MBR found");
+        goto halt;
+    }
 
-    if(HAS_OPT(OPT_VERBOSE))
-        tm_printf("hacker? %x\n", *((uint16_t *)(MEM_MBR+0x1fe)));
     for(i = 0; i < 4; ++i) {
-        if(HAS_OPT(OPT_VERBOSE))
-            tm_printf("boot:%x type:%x lba:%u\n",
-                    parts[i].boot, parts[i].type, parts[i].start_lba);
+        tm_printf("partition %u: boot:%x type:%x lba:%u\n",
+                  i, parts[i].boot, parts[i].type, parts[i].start_lba);
         if(parts[i].type != 0x83) continue;
 
         err = partition_ext2_parse(parts+i, drive_num);
@@ -299,10 +289,11 @@ void boot(void) {
         }
     }
     tm_puts("No EXT2 partition found");
-    for(;;) asm("hlt");
+    goto halt;
 
     /* TODO: load kernel */
 found:
+halt:
     for(;;) asm("hlt");
 }
 

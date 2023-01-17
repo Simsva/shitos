@@ -5,6 +5,8 @@
 #include "v86.h"
 #include "tm_io.h"
 
+#include "boot_opts.h"
+
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
 
 void ext2_read_inode(struct partition_entry *entry, uint8_t drive_num,
@@ -13,7 +15,10 @@ void ext2_read_inode(struct partition_entry *entry, uint8_t drive_num,
 
 void ext2_read_file(struct partition_entry *entry, uint8_t drive_num,
                     struct ext2_superblock *sb, struct ext2_inode *inode,
-                    uint32_t mem_buf);
+                    uint32_t seg_buf);
+
+extern int __STAGE2_END;
+#define __STAGE2_END_P ((uint32_t)&__STAGE2_END)
 
 void xread(uint64_t lba, uint32_t segment, uint32_t offset,
            uint8_t drive_num, uint8_t num_sectors) {
@@ -52,8 +57,10 @@ int8_t partition_ext2_parse(struct partition_entry *entry, uint8_t drive_num) {
                     (sb->s_inodes_count + sb->s_inodes_per_group-1)
                     / sb->s_inodes_per_group);
 
-    tm_printf("ipg:%u\tinodesz:%u\tspb:%u\tbgdt_sz:%u\n",
-              sb->s_inodes_per_group, inode_size, sectors_per_block, bgdt_size);
+    if(HAS_OPT(OPT_VERBOSE))
+        tm_printf("ipg:%u\tinodesz:%u\tspb:%u\tbgdt_sz:%u\n",
+                  sb->s_inodes_per_group, inode_size,
+                  sectors_per_block, bgdt_size);
 
     /* read block group descriptor table */
     bg_lba = entry->start_lba + sectors_per_block;
@@ -64,20 +71,22 @@ int8_t partition_ext2_parse(struct partition_entry *entry, uint8_t drive_num) {
         + 512*((bgdt_size*sizeof(struct ext2_group_desc) + 511)/512);
     bgdt = (struct ext2_group_desc *)(MEM_BUF);
 
+
     /* read root dir inode */
     ext2_read_inode(entry, drive_num, sb, bgdt,
                     mem_buf_head, EXT2_ROOT_INO, &root_inode);
-    tm_printf("root mode: 0%o\tblocks: %u\n",
-              root_inode.i_mode&0777, root_inode.i_blocks/sectors_per_block);
+    if(HAS_OPT(OPT_VERBOSE))
+        tm_printf("root mode: 0%o\tblocks: %u\n",
+                root_inode.i_mode&0777, root_inode.i_blocks/sectors_per_block);
 
-    ext2_read_file(entry, drive_num, sb, &root_inode, mem_buf_head);
+    ext2_read_file(entry, drive_num, sb, &root_inode, (mem_buf_head+15)>>4);
 
 #define D(p) ((struct ext2_dir_entry *)p)
     dir_entry = (void *)mem_buf_head;
     for(i = 0; D(dir_entry)->rec_len; ++i) {
         memcpy(name_buf, D(dir_entry)->name, D(dir_entry)->name_len);
         name_buf[D(dir_entry)->name_len] = '\0';
-        tm_printf("root entry %u name: %s\n", i, name_buf);
+        /* tm_printf("root entry %u name: %s\n", i, name_buf); */
 
         if(strcmp(name_buf, "shitos.elf") == 0) goto file_found;
 
@@ -87,12 +96,18 @@ int8_t partition_ext2_parse(struct partition_entry *entry, uint8_t drive_num) {
 file_found:
 
     /* read contents of shitos.elf */
+    if(HAS_OPT(OPT_VERBOSE))
+        tm_printf("__STAGE2_END: 0x%x\n", ((uint32_t)&__STAGE2_END+15)>>4);
     ext2_read_inode(entry, drive_num, sb, bgdt, 0x5000,
                     D(dir_entry)->inode, &root_inode);
-    ext2_read_file(entry, drive_num, sb, &root_inode, mem_buf_head);
-
-    tm_printf("shitos.elf: %s\n", mem_buf_head);
+    ext2_read_file(entry, drive_num, sb, &root_inode,
+                   (__STAGE2_END_P+15)>>4);
 #undef D
+
+    /* check for block 13 */
+    const uint32_t OFF = ((__STAGE2_END_P+15)&~15) + 4096*12-1;
+    tm_printf("shitos.elf OFF:'%c'\tOFF+1:'%c'\n",
+              *(char *)OFF, *(char *)(OFF+1));
 
     return PARSE_EXT2_SUCCESS;
 }
@@ -119,15 +134,45 @@ void ext2_read_inode(struct partition_entry *entry, uint8_t drive_num,
 
 void ext2_read_file(struct partition_entry *entry, uint8_t drive_num,
                     struct ext2_superblock *sb, struct ext2_inode *inode,
-                    uint32_t mem_buf) {
+                    uint32_t seg_buf) {
+    uint32_t nblocks = inode->i_blocks/EXT2_BLOCK_TO_SECTOR(sb),
+             *sind, *dind, *tind;
     uint8_t i;
 
     /* FIXME: does not handle indirect blocks,
      * even though that will never happen */
-    for(i = 0; i < inode->i_blocks/EXT2_BLOCK_TO_SECTOR(sb); ++i) {
-        tm_printf("reading block %u at %x\n", i, inode->i_block[i]);
+    tm_printf("reading %u(%u) blocks\t%u\n",
+              inode->i_blocks, nblocks, inode->i_size);
+
+    for(i = 0; i < nblocks && i < EXT2_NDIR_BLOCKS; ++i) {
+        if(HAS_OPT(OPT_VERBOSE))
+            tm_printf("reading block %u at 0x%x\n", i, inode->i_block[i]);
         xread(entry->start_lba + inode->i_block[i]*EXT2_BLOCK_TO_SECTOR(sb),
-              0, mem_buf + 512*i*EXT2_BLOCK_TO_SECTOR(sb),
+              seg_buf + (512>>4)*i*EXT2_BLOCK_TO_SECTOR(sb), 0,
               drive_num, EXT2_BLOCK_TO_SECTOR(sb));
     }
+    nblocks -= i;
+    seg_buf += (512>>4)*i*EXT2_BLOCK_TO_SECTOR(sb);
+    if(!nblocks) return;
+    --nblocks; /* sind block counts as one */
+    tm_printf("%u blocks left\n", nblocks);
+
+    /* single indirect block */
+    tm_printf("reading SIND block at 0x%x\n", inode->i_block[EXT2_SIND_BLOCK]);
+    xread(entry->start_lba +
+          inode->i_block[EXT2_SIND_BLOCK]*EXT2_BLOCK_TO_SECTOR(sb),
+          0, MEM_BLK, drive_num, EXT2_BLOCK_TO_SECTOR(sb));
+    sind = (uint32_t *)MEM_BLK;
+
+    for(i = 0; i < nblocks && i < EXT2_BLOCK_SIZE(sb)/sizeof(uint32_t); ++i) {
+        uint32_t block = sind[i];
+        if(HAS_OPT(OPT_VERBOSE))
+            tm_printf("reading block %u at 0x%x\n", i, block);
+        xread(entry->start_lba + sind[i]*EXT2_BLOCK_TO_SECTOR(sb),
+              seg_buf + (512>>4)*i*EXT2_BLOCK_TO_SECTOR(sb), 0,
+              drive_num, EXT2_BLOCK_TO_SECTOR(sb));
+    }
+
+    /* NOTE: does not handle DIND or TIND,
+     * which limits filesize to 4.1MiB with 4096 blocks */
 }

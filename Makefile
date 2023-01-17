@@ -148,7 +148,8 @@ $(EXTPART): working partitions bin/shitos.elf
 
 # NOTE: temporary
 bin/shitos.elf:
-	@echo "dskhfdskfjh world" > $@
+#	@echo "dskhfdskfjh world" > $@
+	@python -c 'print("A"*(4096*12) + "B", end="")' > $@
 
 
 debug: bin $(DEBUG)

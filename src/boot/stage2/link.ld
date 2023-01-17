@@ -25,5 +25,5 @@ SECTIONS
         *(.bss)
     }
 
-    end = .;
+    __STAGE2_END = .;
 }

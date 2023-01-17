@@ -3,11 +3,14 @@
 
 #include "stdint.h"
 
+#define MAX_BLK_SIZE 4096 /* maximum supported ext2 block size */
+
 /* memory locations */
 #define MEM_MBR 0x300
-#define MEM_DRV 0x900    /* drive number placed here by stage1 */
-#define MEM_ESB 0xa00    /* ext2 superblock */
-#define MEM_BUF 0xe00    /* disk buffer */
+#define MEM_DRV 0x900     /* drive number placed here by stage1 */
+#define MEM_ESB 0xa00     /* ext2 superblock */
+#define MEM_BLK 0xe00     /* ext2 buffer for indirect blocks */
+#define MEM_BUF (MEM_BLK + MAX_BLK_SIZE*3) /* disk buffer */
 
 /* partition_ext2_parse error codes */
 #define PARSE_EXT2_SUCCESS 0
