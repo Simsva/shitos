@@ -94,10 +94,10 @@ int8_t partition_ext2_parse(struct partition_entry *entry, uint8_t drive_num) {
     }
     return PARSE_EXT2_NOFILE;
 file_found:
+    if(HAS_OPT(OPT_VERBOSE))
+        tm_printf("found shitos.elf inode: %u\n", D(dir_entry)->inode);
 
     /* read contents of shitos.elf */
-    if(HAS_OPT(OPT_VERBOSE))
-        tm_printf("__STAGE2_END: 0x%x\n", ((uint32_t)&__STAGE2_END+15)>>4);
     ext2_read_inode(entry, drive_num, sb, bgdt, 0x5000,
                     D(dir_entry)->inode, &root_inode);
     ext2_read_file(entry, drive_num, sb, &root_inode,
@@ -136,17 +136,13 @@ void ext2_read_file(struct partition_entry *entry, uint8_t drive_num,
                     struct ext2_superblock *sb, struct ext2_inode *inode,
                     uint32_t seg_buf) {
     uint32_t nblocks = inode->i_blocks/EXT2_BLOCK_TO_SECTOR(sb),
-             *sind, *dind, *tind;
+             *sind;
     uint8_t i;
 
-    /* FIXME: does not handle indirect blocks,
-     * even though that will never happen */
-    tm_printf("reading %u(%u) blocks\t%u\n",
-              inode->i_blocks, nblocks, inode->i_size);
+    if(HAS_OPT(OPT_VERBOSE))
+        tm_printf("reading %u blocks from file\n", nblocks);
 
     for(i = 0; i < nblocks && i < EXT2_NDIR_BLOCKS; ++i) {
-        if(HAS_OPT(OPT_VERBOSE))
-            tm_printf("reading block %u at 0x%x\n", i, inode->i_block[i]);
         xread(entry->start_lba + inode->i_block[i]*EXT2_BLOCK_TO_SECTOR(sb),
               seg_buf + (512>>4)*i*EXT2_BLOCK_TO_SECTOR(sb), 0,
               drive_num, EXT2_BLOCK_TO_SECTOR(sb));
@@ -155,19 +151,14 @@ void ext2_read_file(struct partition_entry *entry, uint8_t drive_num,
     seg_buf += (512>>4)*i*EXT2_BLOCK_TO_SECTOR(sb);
     if(!nblocks) return;
     --nblocks; /* sind block counts as one */
-    tm_printf("%u blocks left\n", nblocks);
 
     /* single indirect block */
-    tm_printf("reading SIND block at 0x%x\n", inode->i_block[EXT2_SIND_BLOCK]);
     xread(entry->start_lba +
           inode->i_block[EXT2_SIND_BLOCK]*EXT2_BLOCK_TO_SECTOR(sb),
           0, MEM_BLK, drive_num, EXT2_BLOCK_TO_SECTOR(sb));
     sind = (uint32_t *)MEM_BLK;
 
     for(i = 0; i < nblocks && i < EXT2_BLOCK_SIZE(sb)/sizeof(uint32_t); ++i) {
-        uint32_t block = sind[i];
-        if(HAS_OPT(OPT_VERBOSE))
-            tm_printf("reading block %u at 0x%x\n", i, block);
         xread(entry->start_lba + sind[i]*EXT2_BLOCK_TO_SECTOR(sb),
               seg_buf + (512>>4)*i*EXT2_BLOCK_TO_SECTOR(sb), 0,
               drive_num, EXT2_BLOCK_TO_SECTOR(sb));
