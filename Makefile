@@ -7,8 +7,6 @@ CFLAGS=-m32 -std=c99 -O2 -Wall -fno-pie -fno-stack-protector
 CFLAGS+=-nostdlib -nostdinc -ffreestanding
 # maybe bad for optimizations?
 CFLAGS+=-fno-builtin-function -fno-builtin
-# TODO: somehow toggle -g only for debugging files
-CFLAGS+=-g
 ASFLAGS=-f elf32 -w+orphan-labels
 LDFLAGS=
 
@@ -34,7 +32,8 @@ STRUCTS_OBJ=$(STRUCTS_SRC:.c=.o)
 DEBUG=$(MBR:.bin=.elf) $(STAGE1:.bin=.elf) $(STAGE2:.bin=.elf) $(STRUCTS_OBJ)
 DIRS=bin partitions working
 BUILDFILES=./bin/* $(MBR_OBJ) $(STAGE1_OBJ) $(STAGE2_OBJ) $(STRUCTS_OBJ)
-BUILDFILES+=$(BOOTPART) $(FATPART) $(FATPART).tmp $(ISO)
+BUILDFILES+=$(BOOTPART) $(FATPART) $(FATPART).tmp $(EXTPART) $(EXTPART).tmp
+BUILDFILES+=$(ISO)
 
 ISO=shitos.iso
 BOOTPART=partitions/bootpart.img
@@ -44,7 +43,7 @@ EXTPART=partitions/extpart.img
 EXTPARTSZ=128k
 
 
-all: bin $(MBR) $(STAGE1) $(STAGE2) $(BOOTPART) $(FATPART)
+all: dirs $(MBR) $(STAGE1) $(STAGE2) $(BOOTPART) $(EXTPART)
 
 
 clean:
@@ -61,6 +60,13 @@ clean:
 %_asm.o: %.asm
 	@echo "AS	$@"
 	@$(AS) -o $@ $< $(ASFLAGS)
+
+
+# will probably not work for kernel due to it being an ELF binary
+# and we do not want to include debug symbols in actual releases
+$(MBR_OBJ): CFLAGS += -g
+$(STAGE1_OBJ): CFLAGS += -g
+$(STAGE2_OBJ): CFLAGS += -g
 
 
 # NOTE: some targets depend on `dirs` but do not list it as a prerequisite,
@@ -110,13 +116,13 @@ $(STRUCTS_OBJ): $(STRUCTS_SRC)
 
 
 # create "bootloader partition"
-$(BOOTPART): partitions $(STAGE1) $(STAGE2)
+$(BOOTPART): $(STAGE1) $(STAGE2)
 	@echo "PART	$(BOOTPART)"
 	@cat $(STAGE1) $(STAGE2) > $(BOOTPART)
 
 
 # create fat partition
-$(FATPART): working partitions
+$(FATPART):
 	@echo "PART	$(FATPART)	$(FATPARTSZ) sectors"
 	@rm $(FATPART).tmp 2>/dev/null || echo jank >/dev/null
 	@dd if=/dev/zero of=$(FATPART).tmp bs=512 count=$(FATPARTSZ) \
@@ -131,35 +137,33 @@ $(FATPART): working partitions
 	@touch $(FATPART)
 
 
-$(EXTPART): working partitions bin/shitos.elf
+$(EXTPART): bin/shitos.elf
 	@echo "PART	$(EXTPART)	$(EXTPARTSZ) sectors"
 	@rm $(EXTPART).tmp 2>/dev/null || echo jank >/dev/null
 	@dd if=/dev/zero of=$(EXTPART).tmp bs=512 count=$(EXTPARTSZ) \
 		>/dev/null 2>&1
 	@mkfs.ext2 -b4096 $(EXTPART).tmp >/dev/null
 
-	@mount -text2 -oloop $(EXTPART).tmp ./working/ >/dev/null
-	@install ./bin/shitos.elf ./working/shitos.elf
-	@umount ./working/
+# TODO: maybe use FUSE for better cross-platform compatibility?
+	@debugfs -wf src/debugfs_ext2 $(EXTPART).tmp
 	@mv $(EXTPART).tmp $(EXTPART)
 # HACK: touch output file to stop rebuilds due to `working` being newer
 	@touch $(EXTPART)
 
 
 # NOTE: temporary
-bin/shitos.elf:
-#	@echo "dskhfdskfjh world" > $@
-	@python -c 'print("A"*(4096*12) + "B", end="")' > $@
+bin/shitos.elf: src/shitos_c.o
+	@echo "LD	shitos.elf"
+	@$(LD) -o $@ $^ $(LDFLAGS) -Tsrc/shitos.ld
+#	@python -c 'print("A"*(4096*12) + "B", end="")' > $@
 
 
-debug: bin $(DEBUG)
+debug: dirs $(DEBUG)
 
 
 # partition and combine to disk image
-# HACK: debug causes rebuilds of iso due to modifying `bin`, so run
-# `make debug iso` instead of `make iso debug` when using both targets
-iso: $(ISO)
-$(ISO): bin $(MBR) $(BOOTPART) $(EXTPART)
+iso: dirs $(ISO)
+$(ISO): $(MBR) $(BOOTPART) $(EXTPART)
 	@echo "ISO	partition.sh"
 	@rm $(ISO) 2>/dev/null || echo jank >/dev/null
 	@./partition.sh -vfm "$(MBR)" "$(ISO)" \

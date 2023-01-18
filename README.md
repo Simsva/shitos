@@ -25,6 +25,12 @@ To make a working disk image and debugging support:
 $ make debug iso
 ```
 
+In case of errors relating to missing directories, run:
+
+``` shell
+$ make dirs
+```
+
 ## Running on hardware
 
 The only official target is QEMU i386, so good luck running it on hardware.
