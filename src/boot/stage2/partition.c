@@ -36,7 +36,8 @@ void xread(uint64_t lba, uint32_t segment, uint32_t offset,
     v86int();
 }
 
-int8_t partition_ext2_parse(struct partition_entry *entry, uint8_t drive_num) {
+int8_t partition_ext2_parse(struct partition_entry *entry, uint8_t drive_num,
+                            void **elf_addr) {
     struct ext2_superblock *sb = (struct ext2_superblock *)MEM_ESB;
     struct ext2_group_desc *bgdt;
     struct ext2_inode root_inode;
@@ -104,11 +105,15 @@ file_found:
                    (__STAGE2_END_P+15)>>4);
 #undef D
 
-    /* check for block 13 */
-    const uint32_t OFF = ((__STAGE2_END_P+15)&~15) + 4096*12-1;
-    tm_printf("shitos.elf OFF:'%c'\tOFF+1:'%c'\n",
-              *(char *)OFF, *(char *)(OFF+1));
+    /* return pointer to shitos.elf */
+    *elf_addr = (void *)((__STAGE2_END_P+15)&~15);
+    tm_printf("elf_addr: 0x%x-0x%x (0x%x)\n",
+              *elf_addr, *elf_addr+root_inode.i_size-1, root_inode.i_size);
 
+    /* HACK: check if the ELF file contents overlap with its location when
+     * loaded. Really jank + hardcoded; will probably remove later */
+    if((uint32_t)(*elf_addr+root_inode.i_size) >= 0x20000)
+        return PARSE_EXT2_TOOBIG;
     return PARSE_EXT2_SUCCESS;
 }
 
@@ -135,9 +140,11 @@ void ext2_read_inode(struct partition_entry *entry, uint8_t drive_num,
 void ext2_read_file(struct partition_entry *entry, uint8_t drive_num,
                     struct ext2_superblock *sb, struct ext2_inode *inode,
                     uint32_t seg_buf) {
-    uint32_t nblocks = inode->i_blocks/EXT2_BLOCK_TO_SECTOR(sb),
-             *sind;
+    uint32_t nblocks = inode->i_blocks/EXT2_BLOCK_TO_SECTOR(sb), *sind;
     uint8_t i;
+
+    /* TODO: read into buffer then copy to avoid limitations
+     * due to 16-bit addressing */
 
     if(HAS_OPT(OPT_VERBOSE))
         tm_printf("reading %u blocks from file\n", nblocks);

@@ -16,6 +16,7 @@
 #define PARSE_EXT2_SUCCESS 0
 #define PARSE_EXT2_NOTEXT2 1
 #define PARSE_EXT2_NOFILE  2
+#define PARSE_EXT2_TOOBIG  3
 
 struct partition_entry {
     uint8_t boot;
@@ -32,6 +33,7 @@ struct partition_entry {
 
 void xread(uint64_t lba, uint32_t segment, uint32_t offset,
            uint8_t drive_num, uint8_t num_sectors);
-int8_t partition_ext2_parse(struct partition_entry *entry, uint8_t drive_num);
+int8_t partition_ext2_parse(struct partition_entry *entry, uint8_t drive_num,
+                            void **elf_addr);
 
 #endif // PARTITION_H_

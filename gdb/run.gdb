@@ -58,6 +58,15 @@ define debug_stage2pe
   continue
 end
 
+# debug kernel (kind of temporary)
+define debug_kernel
+  file bin/shitos.elf
+  arch_pm
+
+  break kmain
+  continue
+end
+
 # v86 debugging
 define p_v86_rm_stack
   p/x *(struct v86_rm_stack *)($arg0 - sizeof(struct v86_rm_stack))

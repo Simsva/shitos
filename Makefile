@@ -1,12 +1,15 @@
 CC=i686-elf-gcc
 AS=nasm
 LD=i686-elf-ld
+STRIP=i686-elf-strip
 
 # FIXME: fix compiler options
 CFLAGS=-m32 -std=c99 -O2 -Wall -fno-pie -fno-stack-protector
 CFLAGS+=-nostdlib -nostdinc -ffreestanding
 # maybe bad for optimizations?
 CFLAGS+=-fno-builtin-function -fno-builtin
+# NOTE: very temporary
+CFLAGS+=-g
 ASFLAGS=-f elf32 -w+orphan-labels
 LDFLAGS=
 
@@ -155,6 +158,7 @@ $(EXTPART): bin/shitos.elf
 bin/shitos.elf: src/shitos_c.o
 	@echo "LD	shitos.elf"
 	@$(LD) -o $@ $^ $(LDFLAGS) -Tsrc/shitos.ld
+#	@$(STRIP) $@
 #	@python -c 'print("A"*(4096*12) + "B", end="")' > $@
 
 

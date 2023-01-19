@@ -6,6 +6,8 @@
 #include "tm_io.h"
 #include "scan_code.h"
 #include "partition.h"
+#include "elf.h"
+#include "string.h"
 
 #include "boot_opts.h"
 
@@ -250,8 +252,12 @@ void reboot(void) {
 void boot(void) {
     struct partition_entry *parts =
         (struct partition_entry *)(MEM_MBR+0x1be);
+    void *elf_off;
+    Elf32_Ehdr *elf_hdr;
+    Elf32_Phdr *elf_phdr;
+    void (*kmain)(uint32_t magic);
+    uint16_t i;
     uint8_t drive_num = *((uint8_t *)MEM_DRV);
-    uint8_t i;
     int8_t err;
 
     /* uninstall keyboard handler */
@@ -261,8 +267,6 @@ void boot(void) {
     tm_line_reset = 0;
     tm_color = 0x07;
     tm_puts("Booting...");
-
-    /* TODO: move all this to before rendering the menu? */
 
     /* read MBR at 0x300 */
     xread(0, 0, MEM_MBR, drive_num, 1);
@@ -277,15 +281,24 @@ void boot(void) {
                   i, parts[i].boot, parts[i].type, parts[i].start_lba);
         if(parts[i].type != 0x83) continue;
 
-        err = partition_ext2_parse(parts+i, drive_num);
+        err = partition_ext2_parse(parts+i, drive_num, (void **)&elf_off);
         switch(err) {
         case PARSE_EXT2_SUCCESS:
-            tm_puts("Success");
+            tm_puts("Found kernel ELF");
             goto found;
 
         case PARSE_EXT2_NOTEXT2:
             tm_puts("Not an EXT2 partition");
             break;
+
+        case PARSE_EXT2_NOFILE:
+            tm_puts("No kernel found in partition");
+            break;
+
+        case PARSE_EXT2_TOOBIG:
+            tm_color = 0x4f;
+            tm_puts("KERNEL FILE IS TOO BIG");
+            goto halt;
         }
     }
     tm_puts("No EXT2 partition found");
@@ -293,6 +306,41 @@ void boot(void) {
 
     /* TODO: load kernel */
 found:
+    elf_hdr = elf_off;
+    if(memcmp(elf_hdr->e_ident, ELFMAG, SELFMAG)) {
+        tm_color = 0x4f;
+        tm_puts("Malformed kernel ELF!");
+        goto halt;
+    }
+
+    if(HAS_OPT(OPT_VERBOSE))
+        tm_puts("Program Header:");
+    elf_phdr = elf_off + elf_hdr->e_phoff;
+    for(i = 0; i < elf_hdr->e_phnum; ++i) {
+        if(HAS_OPT(OPT_VERBOSE))
+            tm_printf("  type:%u off:0x%x vaddr:0x%x paddr:0x%x align:%u\n\
+    filesz:0x%x memsz:0x%x flags:%c%c%c\n",
+                      elf_phdr->p_type, elf_phdr->p_offset, elf_phdr->p_vaddr,
+                      elf_phdr->p_paddr, elf_phdr->p_align, elf_phdr->p_filesz,
+                      elf_phdr->p_memsz, (elf_phdr->p_flags&PF_R) ? 'r' : '-',
+                      (elf_phdr->p_flags&PF_W) ? 'w' : '-',
+                      (elf_phdr->p_flags&PF_X) ? 'x' : '-');
+
+        if(elf_phdr->p_type == PT_LOAD) {
+            memcpy((void *)elf_phdr->p_vaddr, elf_off + elf_phdr->p_offset,
+                   elf_phdr->p_filesz);
+            memset((void *)elf_phdr->p_vaddr + elf_phdr->p_filesz, 0,
+                   elf_phdr->p_memsz - elf_phdr->p_filesz);
+        }
+
+        elf_phdr = (void *)elf_phdr + elf_hdr->e_phentsize;
+    }
+
+    tm_puts("Calling kmain");
+    kmain = (void *)elf_hdr->e_entry;
+    /* TODO: pass actual options to kmain */
+    kmain(0xdeadbeef);
+
 halt:
     for(;;) asm("hlt");
 }

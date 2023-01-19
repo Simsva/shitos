@@ -2,7 +2,7 @@ OUTPUT_FORMAT("elf32-i386")
 ENTRY(kmain)
 SECTIONS
 {
-    /* . = 0x9000; */
+    . = 0x20000;
     .text : ALIGN(4K)
     {
         *(.text)
