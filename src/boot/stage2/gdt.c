@@ -1,6 +1,7 @@
 #include "gdt.h"
-#include "stddef.h"
-#include "stdint.h"
+
+#include <sys/stddef.h>
+#include <sys/stdint.h>
 
 extern void _gdt_flush();
 

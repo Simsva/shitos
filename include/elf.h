@@ -3,7 +3,7 @@
 
 /* based on glibc elf.h */
 
-#include "stdint.h"
+#include <sys/stdint.h>
 
 /* Type for a 16-bit quantity. */
 typedef uint16_t Elf32_Half;

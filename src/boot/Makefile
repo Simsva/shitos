@@ -1,13 +1,14 @@
-include ../../include/mk/programs.mk
-include ../../include/mk/def_flags.mk
+ROOT=../../
+include $(ROOT)/include/mk/programs.mk
+include $(ROOT)/include/mk/def_flags.mk
 CFLAGS+=-g
 
-MBR=../../bin/mbr.bin
+MBR=$(ROOT)/bin/mbr.bin
 MBR_ELF=$(MBR:.bin=.elf)
 MBR_SRC=mbr.asm
 MBR_OBJ=$(MBR_SRC:.asm=_asm.o)
 
-STAGE1=../../bin/stage1.bin
+STAGE1=$(ROOT)/bin/stage1.bin
 STAGE1_ELF=$(STAGE1:.bin=.elf)
 STAGE1_SRC=stage1.asm
 STAGE1_OBJ=$(STAGE1_SRC:.asm=_asm.o)
@@ -25,7 +26,7 @@ clean:
 	@(cd stage2 && env make clean)
 
 
-include ../../include/mk/compile.mk
+include $(ROOT)/include/mk/compile.mk
 
 
 mbr: $(MBR) $(MBR_ELF)
@@ -35,7 +36,7 @@ $(MBR): $(MBR_OBJ)
 # used for debugging
 $(MBR_ELF): $(MBR_OBJ)
 	@echo "LD	$(shell basename $(MBR_ELF))"
-	$(LD) -o $(MBR_ELF) $^ $(LDFLAGS) -Ttext 0x600
+	@$(LD) -o $(MBR_ELF) $^ $(LDFLAGS) -Ttext 0x600
 
 
 stage1: $(STAGE1) $(STAGE1_ELF)

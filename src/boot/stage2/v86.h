@@ -1,7 +1,7 @@
 #ifndef V86_H_
 #define V86_H_
 
-#include "stdint.h"
+#include <sys/stdint.h>
 
 #define INT_V86   0x31
 

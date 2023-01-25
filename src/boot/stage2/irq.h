@@ -1,8 +1,8 @@
 #ifndef IRQ_H_
 #define IRQ_H_
 
+#include <sys/stdint.h>
 #include "idt.h"
-#include "stdint.h"
 
 typedef void (*irq_handler_t)(struct int_regs *);
 

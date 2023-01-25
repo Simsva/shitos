@@ -1,5 +1,4 @@
-/* FIXME: this */
-#include "../boot/stage2/stdint.h"
+#include <sys/stdint.h>
 
 volatile uint16_t *tm_memory = (uint16_t *)0xb8000;
 

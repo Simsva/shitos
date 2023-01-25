@@ -1,10 +1,10 @@
 #include "partition.h"
 
-#include "ext2_fs.h"
-#include "string.h"
+#include <sys/string.h>
+#include <ext2_fs.h>
+
 #include "v86.h"
 #include "tm_io.h"
-
 #include "boot_opts.h"
 
 #define MAX(a, b) ((a) > (b) ? (a) : (b))

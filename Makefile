@@ -1,3 +1,4 @@
+ROOT=./
 include include/mk/programs.mk
 include include/mk/def_flags.mk
 

@@ -1,7 +1,7 @@
 #ifndef IDT_H_
 #define IDT_H_
 
-#include "stdint.h"
+#include <sys/stdint.h>
 #include "isr.h"
 
 #define IDT_SIZE 0x100

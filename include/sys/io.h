@@ -1,7 +1,7 @@
 #ifndef IO_H_
 #define IO_H_
 
-#include "stdint.h"
+#include <sys/stdint.h>
 
 static inline uint8_t inb(uint16_t port) {
     uint8_t out;

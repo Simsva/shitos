@@ -1,8 +1,9 @@
-include ../../include/mk/programs.mk
-include ../../include/mk/def_flags.mk
+ROOT=../../
+include $(ROOT)/include/mk/programs.mk
+include $(ROOT)/include/mk/def_flags.mk
 
-KERNEL=../../bin/shitos.elf
-KERNEL_DBG=../../bin/shitos_dbg.elf
+KERNEL=$(ROOT)/bin/shitos.elf
+KERNEL_DBG=$(ROOT)/bin/shitos_dbg.elf
 KERNEL_SRC_ASM=$(wildcard *.asm)
 KERNEL_SRC_C=$(wildcard *.c)
 KERNEL_OBJ=$(KERNEL_SRC_ASM:.asm=_asm.o) $(KERNEL_SRC_C:.c=_c.o)
@@ -20,7 +21,7 @@ clean:
 	rm -f $(BUILDFILES)
 
 
-include ../../include/mk/compile.mk
+include $(ROOT)/include/mk/compile.mk
 
 
 kernel: $(KERNEL) $(KERNEL_DBG)

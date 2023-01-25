@@ -1,8 +1,9 @@
-include ../../../include/mk/programs.mk
-include ../../../include/mk/def_flags.mk
+ROOT=../../../
+include $(ROOT)/include/mk/programs.mk
+include $(ROOT)/include/mk/def_flags.mk
 CFLAGS+=-g
 
-STAGE2=../../../bin/stage2.bin
+STAGE2=$(ROOT)/bin/stage2.bin
 STAGE2_ELF=$(STAGE2:.bin=.elf)
 STAGE2_SRC_ASM=$(wildcard *.asm)
 STAGE2_SRC_C=$(wildcard *.c)
@@ -20,7 +21,7 @@ clean:
 	rm -f $(BUILDFILES)
 
 
-include ../../../include/mk/compile.mk
+include $(ROOT)/include/mk/compile.mk
 
 
 stage2: $(STAGE2) $(STAGE2_ELF)

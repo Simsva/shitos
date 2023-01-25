@@ -1,8 +1,8 @@
 #include "tm_io.h"
 
-#include "io.h"
-#include "string.h"
-#include "stdarg.h"
+#include <sys/string.h>
+#include <sys/stdarg.h>
+#include <sys/io.h>
 
 static uint16_t *tm_memory = (uint16_t *)0xb8000;
 uint16_t tm_cursor = 0;

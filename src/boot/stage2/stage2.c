@@ -1,13 +1,14 @@
+#include <sys/string.h>
+#include <sys/io.h>
+#include <elf.h>
+
 #include "gdt.h"
 #include "idt.h"
 #include "irq.h"
 #include "isr.h"
-#include "io.h"
 #include "tm_io.h"
 #include "scan_code.h"
 #include "partition.h"
-#include "elf.h"
-#include "string.h"
 
 #include "boot_opts.h"
 
