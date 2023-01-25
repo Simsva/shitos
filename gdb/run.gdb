@@ -58,9 +58,9 @@ define debug_stage2pe
   continue
 end
 
-# debug kernel (kind of temporary)
+# debug kernel
 define debug_kernel
-  file bin/shitos.elf
+  file bin/shitos_dbg.elf
   arch_pm
 
   break kmain
