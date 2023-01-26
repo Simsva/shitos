@@ -1,5 +1,6 @@
 #include <sys/string.h>
-#include <sys/io.h>
+#include <sys/utils.h>
+#include <kernel/def.h>
 #include <elf.h>
 
 #include "gdt.h"
@@ -11,10 +12,6 @@
 #include "partition.h"
 
 #include "boot_opts.h"
-
-#ifndef asm
-# define asm __asm__ volatile
-#endif
 
 /* menu screen offsets */
 #define MENU_BRAND_X  2
@@ -47,12 +44,14 @@ void kb_handler(struct int_regs *);
 void reboot(void);
 void boot(void);
 
+extern void call_kmain(void *, size_t, struct kernel_args);
+
 /* global vars */
 void *global_esp;
 
 uint32_t ticks = 0;
 uint8_t menu_current = 0; /* 0 for main, 1 for options */
-uint8_t boot_options = OPTS_DEFAULT;
+uint8_t boot_options = BOOT_OPTS_DEFAULT;
 uint8_t autoboot = 1, /* set to 0 to stop autoboot */
         booting = 0;  /* is currently booting */
 
@@ -153,7 +152,7 @@ void draw_menu_opts(void) {
     tm_line_reset = MENU_BOX_X+3;
     tm_color = 0x07;
     tm_printf(menu_opts,
-              OPT_FMT(boot_options&OPT_VERBOSE));
+              OPT_FMT(HAS_OPT(BOOT_OPT_VERBOSE)));
 
     tm_cursor_set(0, 24);
     tm_color = 0x07;
@@ -216,12 +215,12 @@ void kb_handler(struct int_regs *r) {
 
         /* Load System Defaults */
         case SCAN1_2: case SCAN1_D:
-            boot_options = OPTS_DEFAULT;
+            boot_options = BOOT_OPTS_DEFAULT;
             break;
 
         /* Boot Options: Verbose */
         case SCAN1_3: case SCAN1_V:
-            boot_options ^= OPT_VERBOSE;
+            boot_options ^= BOOT_OPT_VERBOSE;
             break;
         }
     }
@@ -256,7 +255,7 @@ void boot(void) {
     void *elf_off;
     Elf32_Ehdr *elf_hdr;
     Elf32_Phdr *elf_phdr;
-    void (*kmain)(uint32_t magic);
+    void (*kmain)(struct kernel_args);
     uint16_t i;
     uint8_t drive_num = *((uint8_t *)MEM_DRV);
     int8_t err;
@@ -314,11 +313,11 @@ found:
         goto halt;
     }
 
-    if(HAS_OPT(OPT_VERBOSE))
+    if(HAS_OPT(BOOT_OPT_VERBOSE))
         tm_puts("Program Header:");
     elf_phdr = elf_off + elf_hdr->e_phoff;
     for(i = 0; i < elf_hdr->e_phnum; ++i) {
-        if(HAS_OPT(OPT_VERBOSE))
+        if(HAS_OPT(BOOT_OPT_VERBOSE))
             tm_printf("  type:%u off:0x%x vaddr:0x%x paddr:0x%x align:%u\n\
     filesz:0x%x memsz:0x%x flags:%c%c%c\n",
                       elf_phdr->p_type, elf_phdr->p_offset, elf_phdr->p_vaddr,
@@ -339,8 +338,13 @@ found:
 
     tm_puts("Calling kmain");
     kmain = (void *)elf_hdr->e_entry;
-    /* TODO: pass actual options to kmain */
-    kmain(0xdeadbeef);
+
+    /* call kmain with a known environment */
+    call_kmain(kmain, sizeof(struct kernel_args), (struct kernel_args){
+        .tm_cursor = tm_cursor,
+        .boot_options = boot_options,
+        .drive_num = drive_num,
+    });
 
 halt:
     for(;;) asm("hlt");

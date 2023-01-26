@@ -1,5 +1,5 @@
-INCS=-I$(ROOT)/include
-LIBS=
+INCS+=-I$(ROOT)/include
+# LIBS+=
 
 CFLAGS=-m32 -std=c99 -O2 -Wall -fno-pie -fno-stack-protector
 CFLAGS+=-nostdlib -nostdinc -ffreestanding

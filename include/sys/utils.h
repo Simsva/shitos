@@ -1,20 +1,24 @@
-#ifndef IO_H_
-#define IO_H_
+#ifndef SYS_UTILS_H_
+#define SYS_UTILS_H_
 
 #include <sys/stdint.h>
 
+#ifndef asm
+# define asm __asm__ volatile
+#endif
+
 static inline uint8_t inb(uint16_t port) {
     uint8_t out;
-    __asm__ volatile("inb %1, %0" : "=a" (out) : "dN" (port));
+    asm("inb %1, %0" : "=a" (out) : "dN" (port));
     return out;
 }
 
 static inline void outb(uint16_t port, uint8_t data) {
-    __asm__ volatile("outb %1, %0" : : "dN" (port), "a" (data));
+    asm("outb %1, %0" : : "dN" (port), "a" (data));
 }
 
 static inline void io_wait(void) {
     outb(0x80, 0);
 }
 
-#endif // IO_H_
+#endif // SYS_UTILS_H_

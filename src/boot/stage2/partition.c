@@ -58,7 +58,7 @@ int8_t partition_ext2_parse(struct partition_entry *entry, uint8_t drive_num,
                     (sb->s_inodes_count + sb->s_inodes_per_group-1)
                     / sb->s_inodes_per_group);
 
-    if(HAS_OPT(OPT_VERBOSE))
+    if(HAS_OPT(BOOT_OPT_VERBOSE))
         tm_printf("ipg:%u\tinodesz:%u\tspb:%u\tbgdt_sz:%u\n",
                   sb->s_inodes_per_group, inode_size,
                   sectors_per_block, bgdt_size);
@@ -76,7 +76,7 @@ int8_t partition_ext2_parse(struct partition_entry *entry, uint8_t drive_num,
     /* read root dir inode */
     ext2_read_inode(entry, drive_num, sb, bgdt,
                     mem_buf_head, EXT2_ROOT_INO, &root_inode);
-    if(HAS_OPT(OPT_VERBOSE))
+    if(HAS_OPT(BOOT_OPT_VERBOSE))
         tm_printf("root mode: 0%o\tblocks: %u\n",
                 root_inode.i_mode&0777, root_inode.i_blocks/sectors_per_block);
 
@@ -95,7 +95,7 @@ int8_t partition_ext2_parse(struct partition_entry *entry, uint8_t drive_num,
     }
     return PARSE_EXT2_NOFILE;
 file_found:
-    if(HAS_OPT(OPT_VERBOSE))
+    if(HAS_OPT(BOOT_OPT_VERBOSE))
         tm_printf("found shitos.elf inode: %u\n", D(dir_entry)->inode);
 
     /* read contents of shitos.elf */
@@ -107,8 +107,9 @@ file_found:
 
     /* return pointer to shitos.elf */
     *elf_addr = (void *)((__STAGE2_END_P+15)&~15);
-    tm_printf("elf_addr: 0x%x-0x%x (0x%x)\n",
-              *elf_addr, *elf_addr+root_inode.i_size-1, root_inode.i_size);
+    if(HAS_OPT(BOOT_OPT_VERBOSE))
+        tm_printf("elf location: 0x%x-0x%x (0x%x)\n",
+                *elf_addr, *elf_addr+root_inode.i_size-1, root_inode.i_size);
 
     /* HACK: check if the ELF file contents overlap with its location when
      * loaded. Really jank + hardcoded; will probably remove later */
@@ -146,7 +147,7 @@ void ext2_read_file(struct partition_entry *entry, uint8_t drive_num,
     /* TODO: read into buffer then copy to avoid limitations
      * due to 16-bit addressing */
 
-    if(HAS_OPT(OPT_VERBOSE))
+    if(HAS_OPT(BOOT_OPT_VERBOSE))
         tm_printf("reading %u blocks from file\n", nblocks);
 
     for(i = 0; i < nblocks && i < EXT2_NDIR_BLOCKS; ++i) {

@@ -5,8 +5,8 @@
 
 /* boot options */
 #define HAS_OPT(x)   (boot_options&x)
-#define OPTS_DEFAULT 0x00
-#define OPT_VERBOSE  0x01
+#define BOOT_OPTS_DEFAULT 0x00
+#include <kernel/boot_opts.h>
 
 extern uint8_t boot_options;
 

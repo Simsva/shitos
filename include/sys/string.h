@@ -1,8 +1,8 @@
-#ifndef STRING_H_
-#define STRING_H_
+#ifndef SYS_STRING_H_
+#define SYS_STRING_H_
 
-#include "stddef.h"
-#include "stdint.h"
+#include <sys/stddef.h>
+#include <sys/stdint.h>
 
 static inline void *memset(void *dst, uint8_t val, size_t n) {
     uint8_t *d = dst;
@@ -28,4 +28,4 @@ static inline int strcmp(const char *l, const char *r) {
     return *(unsigned char *)l - *(unsigned char *)r;
 }
 
-#endif // STRING_H_
+#endif // SYS_STRING_H_

@@ -1,4 +1,7 @@
+#include <kernel/def.h>
+#include <kernel/boot_opts.h>
 #include <sys/stdint.h>
+#include <sys/utils.h>
 
 volatile uint16_t *tm_memory = (uint16_t *)0xb8000;
 
@@ -9,17 +12,20 @@ const unsigned char alphanum[] = {
 
 static uint16_t tm_cursor = 0;
 void putc(unsigned char c) {
-    tm_memory[tm_cursor++] = 0x0f00|c;
+    tm_memory[tm_cursor++] = 0x0700|c;
 }
 
-void kmain(uint32_t magic) {
-    char buf[16], *s = buf;
-    putc('0'); putc('x');
-    do
-        *s++ = alphanum[magic%16];
-    while(magic /= 16);
-    while(--s >= buf)
-        putc(*s);
+void puts(char *s) {
+    char c;
+    while((c = *s++)) putc(c);
+}
 
-    for(;;) __asm__ volatile("hlt");
+void kmain(struct kernel_args args) {
+    tm_cursor = args.tm_cursor;
+    puts("puts in kmain");
+
+    if(args.boot_options & BOOT_OPT_VERBOSE)
+        puts(" verbose!");
+
+    for(;;) asm("hlt");
 }

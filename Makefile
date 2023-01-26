@@ -2,8 +2,6 @@ ROOT=./
 include include/mk/programs.mk
 include include/mk/def_flags.mk
 
-PWD=$(shell pwd)
-
 # binaries
 MBR=bin/mbr.bin
 STAGE1=bin/stage1.bin
@@ -14,9 +12,6 @@ STRUCTS_OBJ=$(STRUCTS_SRC:.c=.o)
 
 # output files
 DIRS=bin partitions working
-# BUILDFILES=./bin/* $(MBR_OBJ) $(STAGE1_OBJ) $(STAGE2_OBJ) $(STRUCTS_OBJ)
-# BUILDFILES+=$(BOOTPART) $(FATPART) $(FATPART).tmp $(EXTPART) $(EXTPART).tmp
-# BUILDFILES+=$(ISO)
 BUILDFILES=$(BOOTPART) $(EXTPART) $(EXTPART).tmp $(ISO)
 
 ISO=shitos.iso
@@ -32,8 +27,8 @@ clean:
 	@echo Cleaning root
 	rm -f $(BUILDFILES)
 
-	@(cd $(PWD)/src/boot && env make clean)
-	@(cd $(PWD)/src/kernel && env make clean)
+	@(cd $(ROOT)/src/boot && env make clean)
+	@(cd $(ROOT)/src/kernel && env make clean)
 
 
 include include/mk/compile.mk
@@ -48,13 +43,13 @@ $(DIRS):
 
 
 mbr:
-	@(cd src/boot && env make mbr)
+	@(cd $(ROOT)/src/boot && env make mbr)
 stage1:
-	@(cd src/boot && env make stage1)
+	@(cd $(ROOT)/src/boot && env make stage1)
 stage2:
-	@(cd src/boot && env make stage2)
+	@(cd $(ROOT)/src/boot && env make stage2)
 kernel:
-	@(cd src/kernel && env make)
+	@(cd $(ROOT)/src/kernel && env make)
 
 
 # only used in GDB

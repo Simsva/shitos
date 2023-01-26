@@ -160,10 +160,6 @@ _isr1f:
     cli
     push byte 0x1f
     jmp isr_common_stub
-_isr80:
-    cli
-    push dword 0x80             ; dword to prevent sign extension
-    jmp isr_common_stub
 
 extern _fault_handler
 isr_common_stub:

@@ -23,7 +23,7 @@ clean:
 	@echo Cleaning boot
 	rm -f $(BUILDFILES)
 
-	@(cd stage2 && env make clean)
+	@(cd $(ROOT)/src/boot/stage2 && env make clean)
 
 
 include $(ROOT)/include/mk/compile.mk
@@ -50,7 +50,7 @@ $(STAGE1_ELF): $(STAGE1_OBJ)
 
 
 stage2:
-	@(cd stage2 && env make)
+	@(cd $(ROOT)/src/boot/stage2 && env make)
 
 
 .PHONY: all clean mbr stage1 stage2

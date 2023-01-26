@@ -1,5 +1,5 @@
-#ifndef STDINT_H_
-#define STDINT_H_
+#ifndef SYS_STDINT_H_
+#define SYS_STDINT_H_
 
 typedef char               int8_t;
 typedef short              int16_t;
@@ -46,4 +46,4 @@ typedef unsigned long long uint64_t;
 #define UINT32_C(c)  c ## UL
 #define UINT64_C(c)  c ## ULL
 
-#endif // STDINT_H_
+#endif // SYS_STDINT_H_

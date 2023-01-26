@@ -2,7 +2,7 @@
 
 #include <sys/string.h>
 #include <sys/stdarg.h>
-#include <sys/io.h>
+#include <sys/utils.h>
 
 static uint16_t *tm_memory = (uint16_t *)0xb8000;
 uint16_t tm_cursor = 0;

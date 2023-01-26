@@ -1,5 +1,5 @@
-#ifndef STDARG_H_
-#define STDARG_H_
+#ifndef SYS_STDARG_H_
+#define SYS_STDARG_H_
 
 #ifndef _VA_LIST_DECLARED
 # define _VA_LIST_DECLARED
@@ -11,4 +11,4 @@ typedef __builtin_va_list va_list;
 #define va_copy(dest, src)   __builtin_va_copy((dest), (src))
 #define va_end(ap)           __builtin_va_end(ap)
 
-#endif // STDARG_H_
+#endif // SYS_STDARG_H_
