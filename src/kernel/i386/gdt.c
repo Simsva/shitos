@@ -54,7 +54,9 @@ void gdt_install(void) {
     _gdt_set_gate(3, 0, UINT16_MAX, 0x9a /* 1001 1010 */, 0x00 /* 0000 0000 */);
     _gdt_set_gate(4, 0, UINT16_MAX, 0x92 /* 1001 0010 */, 0x00 /* 0000 0000 */);
 
-    /* NOTE: the bootloader runs completely in ring 0 */
+    /* ring 3 CS and DS */
+    _gdt_set_gate(5, 0, UINT32_MAX, 0xfa /* 1111 1010 */, 0xc0 /* 1100 0000 */);
+    _gdt_set_gate(6, 0, UINT32_MAX, 0xf2 /* 1111 0010 */, 0xc0 /* 1100 0000 */);
 
     _gdt_flush();
 }

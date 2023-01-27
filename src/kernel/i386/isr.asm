@@ -30,6 +30,7 @@ global _isr1c
 global _isr1d
 global _isr1e
 global _isr1f
+global _isr80
 
 _isr00:
     cli

@@ -125,13 +125,15 @@ void _irq_handler(struct int_regs r) {
     /* To get the actual interrupt number, look at IRQ0_OFFSET and IRQ8_OFFSET */
     handler = _irq_handlers[r.int_no];
 
-    if(handler)
+    if(handler && r.int_no != 0)
         handler(&r);
-    /* NOTE: in the real kernel, IRQ0 (timer) might be used to switch tasks so
-     * it should be handled after sending the EOI */
 
     /* if slave IRQ (8-15), send EOI to the slave controller */
     if(r.int_no > 7)
         outb(PIC2_CMD, PIC_EOI);
     outb(PIC1_CMD, PIC_EOI);
+
+    /* handle IRQ0 (timer) after EOI in case of task switching */
+    if(handler && r.int_no == 0)
+        handler(&r);
 }
