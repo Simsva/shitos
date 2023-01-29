@@ -7,6 +7,10 @@
 # define asm __asm__ volatile
 #endif
 
+#define MAX(a, b) (((a) > (b)) ? (a) : (b))
+#define MIN(a, b) (((a) < (b)) ? (a) : (b))
+#define LEN(a) (sizeof(a)/sizeof(a[0]))
+
 static inline uint8_t inb(uint16_t port) {
     uint8_t out;
     asm("inb %1, %0" : "=a" (out) : "dN" (port));

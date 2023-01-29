@@ -9,29 +9,25 @@
 #include "i386/irq.h"
 #include "i386/isr.h"
 
-volatile uint16_t *tm_memory = (uint16_t *)0xb8000;
-
-const unsigned char alphanum[] = {
-    '0', '1', '2', '3', '4', '5', '6', '7',
-    '8', '9', 'a', 'b', 'c', 'd', 'e', 'f',
-};
-
-static uint16_t tm_cursor = 0;
-void putc(unsigned char c) {
-    tm_memory[tm_cursor++] = 0x0700|c;
-}
+#include "console/tm.h"
 
 void puts(char *s) {
     char c;
-    while((c = *s++)) putc(c);
+    while((c = *s++)) tm_putc(c);
+}
+
+void itos(char *buf, uint8_t num, uint8_t len) {
+    do
+        buf[--len] = (num%10) + '0';
+    while((num /= 10));
+    while(len)
+        buf[--len] = '0';
 }
 
 void kmain(struct kernel_args args) {
-    tm_cursor = args.tm_cursor;
-    puts("puts in kmain");
-
-    if(args.boot_options & BOOT_OPT_VERBOSE)
-        puts(" verbose!");
+    /* TODO: remove this */
+    tm_cur_x = args.tm_cursor % 80;
+    tm_cur_y = args.tm_cursor / 80;
 
     /* i386 things */
     asm("cli");
@@ -40,6 +36,23 @@ void kmain(struct kernel_args args) {
     irq_install();
     isrs_install();
     asm("sti");
+
+    puts("puts in kmain\n");
+
+    uint8_t i, j, n;
+    char buf[4] = { '\0' };
+
+    puts("SGR test:\n");
+    for(i = 0; i < 11; ++i) {
+        for(j = 0; j < 10; ++j) {
+            n = 10 * i + j;
+            if(n > 108) break;
+            itos(buf, n, 3);
+            puts("\033["); puts(buf); puts("m ");
+            puts(buf); puts("\033[m");
+        }
+        tm_putc('\n');
+    }
 
     for(;;) asm("hlt");
 }
