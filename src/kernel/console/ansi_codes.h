@@ -10,7 +10,6 @@
 #define C0_FF  ('\f')
 #define C0_CR  ('\r')
 #define C0_ESC ('\033')
-#define C0_DEL ('\177')
 
 /* ANSI escape codes */
 #define Fe_SS2 ('N')

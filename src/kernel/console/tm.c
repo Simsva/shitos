@@ -17,12 +17,27 @@
 #define LEVEL_CSI  2
 #define LEVEL_OSC  3
 
+/* tm_options */
+#define TM_INVERT   0x01
+#define TM_CONCEAL  0x02
+
 volatile uint16_t *tm_memory = (uint16_t *)0xb8000;
 uint8_t tm_cur_x, tm_cur_y;
 uint8_t tm_cur_saved_x = 0, tm_cur_saved_y = 0;
 uint8_t tm_color = DEFAULT_COLOR, tm_esc_level = LEVEL_NONE;
+uint8_t tm_options = 0;
 
+void tm_cursor_update(void);
 uint16_t tm_parse_dec_rev(const char *, uint8_t);
+
+void tm_cursor_update(void) {
+    /* update blinking cursor */
+    uint16_t tm_cursor = tm_cur_x + tm_cur_y*TM_WIDTH;
+    outb(0x03d4, 14);
+    outb(0x03d5, tm_cursor>>8);
+    outb(0x03d4, 15);
+    outb(0x03d5, tm_cursor & 0xff);
+}
 
 void tm_putc(unsigned char c) {
     switch(tm_esc_level) {
@@ -56,13 +71,19 @@ void tm_putc(unsigned char c) {
             ++tm_cur_y;
             break;
 
-        /* ESC character (begins C1 sequence) */
+        /* ESC character (begins ESC sequence) */
         case C0_ESC:
             tm_esc_level = 1;
             break;
         }
     } else {
-        tm_memory[CURSOR] = tm_color<<8 | c;
+        uint8_t real_color = tm_color;
+        if(tm_options & TM_INVERT)
+            real_color = (real_color>>4) | (real_color<<4);
+        if(tm_options & TM_CONCEAL)
+            real_color = (real_color&0xf0) | ((real_color&0xf0)>>4);
+
+        tm_memory[CURSOR] = real_color<<8 | c;
         ++tm_cur_x;
     }
 
@@ -73,6 +94,8 @@ void tm_putc(unsigned char c) {
 
     if(tm_cur_y >= TM_HEIGHT)
         tm_scroll((tm_cur_y--) - TM_HEIGHT + 1);
+
+    tm_cursor_update();
 }
 
 /* handle single-char escape sequences */
@@ -252,7 +275,33 @@ void tm_sgr(uint8_t mode) {
         return;
     }
 
-    if(mode == SGR_RESET) tm_color = DEFAULT_COLOR;
+    switch(mode) {
+    case SGR_RESET:
+        tm_color = DEFAULT_COLOR;
+        tm_options = 0;
+        break;
+
+    case SGR_INVERT:
+        tm_options |= TM_INVERT;
+        break;
+    case SGR_NOT_INVERT:
+        tm_options &= ~TM_INVERT;
+        break;
+
+    case SGR_CONCEAL:
+        tm_options |= TM_CONCEAL;
+        break;
+    case SGR_NOT_CONCEAL:
+        tm_options &= ~TM_CONCEAL;
+        break;
+
+    case SGR_FG_COLOR_DEFAULT:
+        tm_color = (tm_color&0xf0) | (DEFAULT_COLOR&0x0f);
+        break;
+    case SGR_BG_COLOR_DEFAULT:
+        tm_color = (tm_color&0x0f) | (DEFAULT_COLOR&0xf0);
+        break;
+    }
 }
 
 uint16_t tm_parse_dec_rev(const char *s, uint8_t i) {
