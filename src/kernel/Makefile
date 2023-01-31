@@ -10,8 +10,8 @@ ARCHDIR=arch/$(ARCH)
 KERNEL=$(ROOT)/bin/shitos.elf
 KERNEL_SRC_ASM=$(wildcard *.asm) $(wildcard **/*.asm) $(wildcard $(ARCHDIR)/*.asm)
 KERNEL_SRC_C=$(wildcard *.c) $(wildcard **/*.c) $(wildcard $(ARCHDIR)/*.c)
-KERNEL_SRC_MAKE=$(KERNEL_SRC_C:.c=.c.d)
-KERNEL_OBJ=$(KERNEL_SRC_ASM:.asm=.asm.o) $(KERNEL_SRC_C:.c=.c.o)
+KERNEL_SRC_MAKE=$(KERNEL_SRC_C:.c=_c.d)
+KERNEL_OBJ=$(KERNEL_SRC_ASM:.asm=_asm.o) $(KERNEL_SRC_C:.c=_c.o)
 KERNEL_LD=$(ARCHDIR)/shitos.ld
 
 BUILDFILES=$(KERNEL_OBJ) $(KERNEL_SRC_MAKE) $(KERNEL)

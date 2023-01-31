@@ -10,8 +10,8 @@ STAGE2=$(ROOT)/bin/stage2.bin
 STAGE2_ELF=$(STAGE2:.bin=.elf)
 STAGE2_SRC_ASM=$(wildcard *.asm)
 STAGE2_SRC_C=$(wildcard *.c)
-STAGE2_SRC_MAKE=$(STAGE2_SRC_C:.c=.c.d)
-STAGE2_OBJ=$(STAGE2_SRC_ASM:.asm=.asm.o) $(STAGE2_SRC_C:.c=.c.o)
+STAGE2_SRC_MAKE=$(STAGE2_SRC_C:.c=_c.d)
+STAGE2_OBJ=$(STAGE2_SRC_ASM:.asm=_asm.o) $(STAGE2_SRC_C:.c=_c.o)
 STAGE2_LD=link.ld
 
 BUILDFILES=$(STAGE2_OBJ) $(STAGE2_SRC_MAKE) $(STAGE2) $(STAGE2_ELF)

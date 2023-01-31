@@ -11,8 +11,8 @@ STRUCTS_SRC=gdb/structs.c
 STRUCTS_OBJ=$(STRUCTS_SRC:.c=.o)
 
 # output files
-DIRS=bin partitions working
-BUILDFILES=$(BOOTPART) $(EXTPART) $(EXTPART).tmp $(ISO) $(STRUCTS_OBJ)
+DIRS=bin partitions $(SYSROOT)
+BUILDFILES=$(BOOTPART) $(EXTPART) $(ISO) $(STRUCTS_OBJ)
 
 ISO=shitos.iso
 BOOTPART=partitions/bootpart.img
@@ -64,32 +64,23 @@ libc:
 # only used in GDB
 structs: $(STRUCTS_OBJ)
 $(STRUCTS_OBJ): $(STRUCTS_SRC)
-	@echo "CC	$(shell basename $(STRUCTS_OBJ))"
+	@echo "CC	$(shell basename $@)"
 	@$(CC) -o $(STRUCTS_OBJ) -c $(STRUCTS_SRC) -O0 -g
 
 
 # create "bootloader partition"
 $(BOOTPART): stage1 stage2
-	@echo "PART	$(shell basename $(BOOTPART))"
+	@echo "PART	$(shell basename $@)"
 	@cat $(STAGE1) $(STAGE2) > $(BOOTPART)
 
 
 $(EXTPART): kernel
-	@echo "PART	$(shell basename $(EXTPART))	$(EXTPARTSZ) sectors"
-	@rm $(EXTPART).tmp 2>/dev/null || echo jank >/dev/null
-	@dd if=/dev/zero of=$(EXTPART).tmp bs=512 count=$(EXTPARTSZ) \
-		>/dev/null 2>&1
-	@mkfs.ext2 -b4096 $(EXTPART).tmp >/dev/null
-
-# TODO: maybe use FUSE for better cross-platform compatibility?
-	@debugfs -wf src/debugfs_ext2 $(EXTPART).tmp
-	@mv $(EXTPART).tmp $(EXTPART)
-# HACK: touch output file to stop rebuilds due to `working` being newer
-	@touch $(EXTPART)
+	@echo "PART	$(shell basename $@)	$(EXTPARTSZ) sectors"
+	@dd if=/dev/zero of=$(EXTPART) bs=512 count=$(EXTPARTSZ) >/dev/null 2>&1
+	@mke2fs -b4096 -d$(SYSROOT) $(EXTPART)
 
 
-# FIXME: for the time being debug (except structs) is half-forced on all builds
-debug: dirs structs #$(DEBUG)
+debug: dirs structs
 
 
 # partition and combine to disk image

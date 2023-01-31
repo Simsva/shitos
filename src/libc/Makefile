@@ -14,10 +14,10 @@ LIBC=$(ROOT)/bin/libc.a
 LIBK=$(ROOT)/bin/libk.a
 LIBC_SRC_ASM=$(wildcard **/*.asm)
 LIBC_SRC_C=$(wildcard **/*.c)
-LIBC_SRC_MAKE=$(LIBC_SRC_C:.c=.c.d)
+LIBC_SRC_MAKE=$(LIBC_SRC_C:.c=_c.d)
 
 # FIXME: differentiate free from hosted objects
-LIBC_OBJ=$(LIBC_SRC_ASM:.asm=.asm.o) $(LIBC_SRC_C:.c=.c.o)
+LIBC_OBJ=$(LIBC_SRC_ASM:.asm=_asm.o) $(LIBC_SRC_C:.c=_c.o)
 LIBK_OBJ=$(LIBC_OBJ:.o=.libk.o)
 
 # BINARIES=$(LIBC) $(LIBK)
@@ -36,11 +36,11 @@ clean:
 include $(ROOT)/include/mk/compile.mk
 
 
-%.c.libk.o: %.c
+%_c.libk.o: %.c
 	@echo "CC	$(shell basename $@)"
 	@$(CC) -o $@ -c $< $(LIBK_CPPFLAGS) $(LIBK_CFLAGS)
 
-%.asm.libk.o: %.asm
+%_asm.libk.o: %.asm
 	@echo "AS	$(shell basename $@)"
 	@$(AS) -o $@ $< $(LIBK_ASFLAGS)
 

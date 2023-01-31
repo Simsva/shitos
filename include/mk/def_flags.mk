@@ -1,6 +1,6 @@
 ARCH?=i386
 HOST?=i686-elf
-SYSROOT?=$(ROOT)/working/
+SYSROOT?=$(ROOT)/sysroot/
 PREFIX?=/usr
 EXEC_PREFIX?=$(PREFIX)
 SYSINCLUDEDIR?=$(PREFIX)/include

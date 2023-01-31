@@ -1,7 +1,7 @@
 # Build files
 bin/
 partitions/
-working/
+sysroot/
 *.o
 *.d
 *.bin
