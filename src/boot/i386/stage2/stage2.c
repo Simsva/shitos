@@ -250,6 +250,9 @@ void reboot(void) {
     for(;;) asm("hlt");
 }
 
+/* GCC 12 does not like this */
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Warray-bounds"
 void boot(void) {
     struct partition_entry *parts =
         (struct partition_entry *)(MEM_MBR+0x1be);
@@ -350,6 +353,7 @@ found:
 halt:
     for(;;) asm("hlt");
 }
+#pragma GCC diagnostic pop
 
 /* bootloader main */
 void bmain(void *esp) {

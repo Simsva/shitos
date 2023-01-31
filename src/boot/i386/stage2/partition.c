@@ -36,12 +36,15 @@ void xread(uint64_t lba, uint32_t segment, uint32_t offset,
     v86int();
 }
 
+/* GCC 12 does not like this code */
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Warray-bounds"
 int8_t partition_ext2_parse(struct partition_entry *entry, uint8_t drive_num,
                             void **elf_addr) {
     struct ext2_superblock *sb = (struct ext2_superblock *)MEM_ESB;
     struct ext2_group_desc *bgdt;
     struct ext2_inode root_inode;
-    uint32_t bg_lba, bgdt_size, i, mem_buf_head;
+    uint32_t bg_lba, bgdt_size, mem_buf_head;
     uint16_t sectors_per_block, inode_size;
     void *dir_entry;
     char name_buf[256];
@@ -84,7 +87,7 @@ int8_t partition_ext2_parse(struct partition_entry *entry, uint8_t drive_num,
 
 #define D(p) ((struct ext2_dir_entry *)p)
     dir_entry = (void *)mem_buf_head;
-    for(i = 0; D(dir_entry)->rec_len; ++i) {
+    while(D(dir_entry)->rec_len) {
         memcpy(name_buf, D(dir_entry)->name, D(dir_entry)->name_len);
         name_buf[D(dir_entry)->name_len] = '\0';
         /* tm_printf("root entry %u name: %s\n", i, name_buf); */
@@ -175,3 +178,4 @@ void ext2_read_file(struct partition_entry *entry, uint8_t drive_num,
     /* NOTE: does not handle DIND or TIND,
      * which limits filesize to 4.1MiB with 4096 blocks */
 }
+#pragma GCC diagnostic pop
