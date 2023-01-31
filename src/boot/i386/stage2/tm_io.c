@@ -49,6 +49,7 @@ void tm_putc(unsigned char c) {
 
         case '\n':
             ++y;
+            __attribute__((fallthrough));
         case '\r':
             x = tm_line_reset;
             break;

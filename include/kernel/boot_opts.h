@@ -1,6 +1,0 @@
-#ifndef KERNEL_BOOT_OPTS_H_
-#define KERNEL_BOOT_OPTS_H_
-
-#define BOOT_OPT_VERBOSE 0x01
-
-#endif // KERNEL_BOOT_OPTS_H_

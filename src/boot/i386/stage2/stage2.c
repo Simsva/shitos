@@ -1,6 +1,6 @@
 #include <sys/string.h>
 #include <sys/utils.h>
-#include <kernel/def.h>
+#include <boot/def.h>
 #include <elf.h>
 
 #include "gdt.h"
@@ -159,12 +159,12 @@ void draw_menu_opts(void) {
 }
 
 /* NOTE: runs at 18.222 Hz by default */
-void timer_handler(struct int_regs *r) {
+void timer_handler(__attribute__((unused)) struct int_regs *r) {
     ++ticks;
 }
 
 /* NOTE: ignores SCAN_EXTENDED */
-void kb_handler(struct int_regs *r) {
+void kb_handler(__attribute__((unused)) struct int_regs *r) {
     uint8_t sc;
     uint16_t cursor;
 
@@ -199,6 +199,7 @@ void kb_handler(struct int_regs *r) {
         /* Reboot */
         case SCAN1_3: case SCAN1_R:
             reboot();
+            return; /* will never happen */
 
         /* Boot Options */
         case SCAN1_4: case SCAN1_O:

@@ -3,6 +3,7 @@ bin/
 partitions/
 working/
 *.o
+*.d
 *.bin
 *.iso
 *.img

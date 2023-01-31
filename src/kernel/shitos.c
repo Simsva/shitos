@@ -1,15 +1,17 @@
-#include <kernel/def.h>
-#include <kernel/boot_opts.h>
+#include <boot/def.h>
+#include <boot/boot_opts.h>
 #include <sys/stdint.h>
 #include <sys/utils.h>
 
-/* i386 things */
-#include "i386/gdt.h"
-#include "i386/idt.h"
-#include "i386/irq.h"
-#include "i386/isr.h"
+#include <stdio.h>
 
-#include "console/tm.h"
+/* i386 things */
+#include "arch/i386/gdt.h"
+#include "arch/i386/idt.h"
+#include "arch/i386/irq.h"
+#include "arch/i386/isr.h"
+
+#include "tty/tm.h"
 
 void puts(char *s) {
     char c;
@@ -53,6 +55,8 @@ void kmain(struct kernel_args args) {
         }
         tm_putc('\n');
     }
+
+    tm_putc('0' + test(1,3));
 
     for(;;) asm("hlt");
 }

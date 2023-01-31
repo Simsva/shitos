@@ -1,5 +1,5 @@
-#ifndef GDT_H_
-#define GDT_H_
+#ifndef I386_GDT_H_
+#define I386_GDT_H_
 
 #include <sys/stdint.h>
 
@@ -22,4 +22,4 @@ void _gdt_set_gate(int i, uint32_t base, uint32_t limit,
                    uint8_t access, uint8_t flags);
 void gdt_install(void);
 
-#endif // GDT_H_
+#endif // I386_GDT_H_

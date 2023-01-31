@@ -1,4 +1,7 @@
-CC=i686-elf-gcc
 AS=nasm
-LD=i686-elf-ld
-STRIP=i686-elf-strip
+AR=$(HOST)-ar
+CC=$(HOST)-gcc --sysroot=$(SYSROOT)
+LD=$(HOST)-ld --sysroot=$(SYSROOT)
+STRIP=$(HOST)-strip
+
+CC+=-isystem=$(SYSINCLUDEDIR)

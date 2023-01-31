@@ -1,5 +1,5 @@
-#ifndef KERNEL_DEF_H_
-#define KERNEL_DEF_H_
+#ifndef BOOT_DEF_H_
+#define BOOT_DEF_H_
 
 #include <sys/stdint.h>
 
@@ -9,4 +9,4 @@ struct kernel_args {
     uint8_t drive_num;
 };
 
-#endif // KERNEL_DEF_H_
+#endif // BOOT_DEF_H_

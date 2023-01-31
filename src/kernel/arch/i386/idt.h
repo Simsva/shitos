@@ -1,5 +1,5 @@
-#ifndef IDT_H_
-#define IDT_H_
+#ifndef I386_IDT_H_
+#define I386_IDT_H_
 
 #include <sys/stdint.h>
 
@@ -35,4 +35,4 @@ void _idt_set_gate(uint8_t i, uint32_t offset,
                    uint16_t selector, uint8_t flags);
 void idt_install(void);
 
-#endif // IDT_H_
+#endif // I386_IDT_H_

@@ -1,14 +1,23 @@
-INCS+=-I$(ROOT)/include
-# LIBS+=
+ARCH?=i386
+HOST?=i686-elf
+SYSROOT?=$(ROOT)/working/
+PREFIX?=/usr
+EXEC_PREFIX?=$(PREFIX)
+SYSINCLUDEDIR?=$(PREFIX)/include
+SYSLIBDIR?=$(EXEC_PREFIX)/lib
 
-CFLAGS=-m32 -std=c99 -O2 -Wall -fno-pie -fno-stack-protector
-CFLAGS+=-nostdlib -nostdinc -ffreestanding
-CFLAGS+=-fno-builtin-function -fno-builtin
-CFLAGS+=$(INCS)
+INCS+=
+LIBS+=
 
-ASFLAGS=-f elf32 -w+orphan-labels
+CPPFLAGS?=
+CPPFLAGS+=$(INCS)
 
-LDFLAGS=$(LIBS)
+CFLAGS?=-O2 -g
+CFLAGS+=-Wall -Wextra -MD -std=c99
+# CFLAGS+=-fno-stack-protector -ffreestanding
 
-# NOTE: unused
-MAKEOPTS=
+ASFLAGS?=
+ASFLAGS+=-f elf32 -w+orphan-labels
+
+LDFLAGS?=
+LDFLAGS+=$(LIBS)

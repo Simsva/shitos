@@ -1,15 +1,10 @@
 # default compilation targets
 
-%_c.o: %.c
+%.c.o: %.c
 	@echo "CC	$(shell basename $@)"
-	@$(CC) -o $@ -c $< $(CFLAGS)
+	@$(CC) -o $@ -c $< $(CPPFLAGS) $(CFLAGS)
 
 
-%_asm.o: %.asm
+%.asm.o: %.asm
 	@echo "AS	$(shell basename $@)"
 	@$(AS) -o $@ $< $(ASFLAGS)
-
-
-%_c_dbg.o: %.c
-	@echo "CC	$(shell basename $@)"
-	@$(CC) -o $@ -c $< $(CFLAGS) -g

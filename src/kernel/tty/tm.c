@@ -21,11 +21,11 @@
 #define TM_INVERT   0x01
 #define TM_CONCEAL  0x02
 
-volatile uint16_t *tm_memory = (uint16_t *)0xb8000;
+static uint16_t *const tm_memory = (uint16_t *)0xb8000;
 uint8_t tm_cur_x, tm_cur_y;
-uint8_t tm_cur_saved_x = 0, tm_cur_saved_y = 0;
-uint8_t tm_color = DEFAULT_COLOR, tm_esc_level = LEVEL_NONE;
-uint8_t tm_options = 0;
+static uint8_t tm_cur_saved_x = 0, tm_cur_saved_y = 0;
+static uint8_t tm_color = DEFAULT_COLOR, tm_esc_level = LEVEL_NONE;
+static uint8_t tm_options = 0;
 
 void tm_cursor_update(void);
 uint16_t tm_parse_dec_rev(const char *, uint8_t);
@@ -63,6 +63,7 @@ void tm_putc(unsigned char c) {
 
         case C0_LF:
             ++tm_cur_y;
+            __attribute__((fallthrough));
         case C0_CR:
             tm_cur_x = 0;
             break;
@@ -73,7 +74,7 @@ void tm_putc(unsigned char c) {
 
         /* ESC character (begins ESC sequence) */
         case C0_ESC:
-            tm_esc_level = 1;
+            tm_esc_level = LEVEL_ESC;
             break;
         }
     } else {
@@ -106,7 +107,7 @@ void tm_handle_esc(unsigned char c) {
     }
 }
 
-char tm_csi_buf[8];
+char tm_csi_buf[6];
 uint16_t tm_csi_args[2];
 uint8_t tm_csi_buf_i = 0, tm_csi_args_i = 0;
 void tm_handle_csi(unsigned char c) {
@@ -116,12 +117,11 @@ void tm_handle_csi(unsigned char c) {
         if(tm_csi_buf_i < LEN(tm_csi_buf))
             tm_csi_buf[tm_csi_buf_i++] = c;
         return;
-    } else {
-        if(tm_csi_args_i < LEN(tm_csi_args))
-            tm_csi_args[tm_csi_args_i++]
-                = tm_parse_dec_rev(tm_csi_buf, tm_csi_buf_i);
-        tm_csi_buf_i = 0;
     }
+    if(tm_csi_args_i < LEN(tm_csi_args))
+        tm_csi_args[tm_csi_args_i++]
+            = tm_parse_dec_rev(tm_csi_buf, tm_csi_buf_i);
+    tm_csi_buf_i = 0;
 
     /* all other valid characters count as separators, not just ';' */
     if(c >= ':' && c <= '?') return;
@@ -130,6 +130,7 @@ void tm_handle_csi(unsigned char c) {
     switch(c) {
     case CSI_CPL:
         tm_cur_x = 0;
+        __attribute__((fallthrough));
     case CSI_CUU:
         b = tm_csi_args[0] ? tm_csi_args[0] : 1;
         tm_cur_y = (tm_cur_y < b)
@@ -139,6 +140,7 @@ void tm_handle_csi(unsigned char c) {
 
     case CSI_CNL:
         tm_cur_x = 0;
+        __attribute__((fallthrough));
     case CSI_CUD:
         b = tm_csi_args[0] ? tm_csi_args[0] : 1;
         tm_cur_y = (TM_HEIGHT-1 - tm_cur_y < b)

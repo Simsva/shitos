@@ -1,5 +1,5 @@
-#ifndef IRQ_H_
-#define IRQ_H_
+#ifndef I386_IRQ_H_
+#define I386_IRQ_H_
 
 #include <sys/stdint.h>
 
@@ -13,4 +13,4 @@ void irq_handler_install(uint8_t irq, irq_handler_t handler);
 void irq_handler_uninstall(uint8_t irq);
 void irq_install(void);
 
-#endif // IRQ_H_
+#endif // I386_IRQ_H_

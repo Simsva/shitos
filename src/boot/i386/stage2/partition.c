@@ -1,7 +1,7 @@
 #include "partition.h"
 
 #include <sys/string.h>
-#include <ext2_fs.h>
+#include <ext2fs/ext2_fs.h>
 
 #include "v86.h"
 #include "tm_io.h"

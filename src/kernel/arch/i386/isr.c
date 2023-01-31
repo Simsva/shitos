@@ -114,7 +114,7 @@ const char *exception_msgs[] = {
     "Reserved",
 };
 
-void _fault_handler(struct int_regs r) {
+void _fault_handler(__attribute__((unused)) struct int_regs r) {
     /* NOTE: only interrupt 0x1f and below will call this */
     /* tm_color = 0x4f; */
     /* tm_printf("int 0x%x: %s\n", r.int_no, exception_msgs[r.int_no]); */

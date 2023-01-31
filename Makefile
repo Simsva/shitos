@@ -1,6 +1,6 @@
 ROOT=./
-include include/mk/programs.mk
 include include/mk/def_flags.mk
+include include/mk/programs.mk
 
 # binaries
 MBR=bin/mbr.bin
@@ -12,7 +12,7 @@ STRUCTS_OBJ=$(STRUCTS_SRC:.c=.o)
 
 # output files
 DIRS=bin partitions working
-BUILDFILES=$(BOOTPART) $(EXTPART) $(EXTPART).tmp $(ISO)
+BUILDFILES=$(BOOTPART) $(EXTPART) $(EXTPART).tmp $(ISO) $(STRUCTS_OBJ)
 
 ISO=shitos.iso
 BOOTPART=partitions/bootpart.img
@@ -27,8 +27,14 @@ clean:
 	@echo Cleaning root
 	rm -f $(BUILDFILES)
 
-	@(cd $(ROOT)/src/boot && env make clean)
+	@(cd $(ROOT)/src/boot/$(ARCH) && env make clean)
 	@(cd $(ROOT)/src/kernel && env make clean)
+	@(cd $(ROOT)/src/libc && env make clean)
+
+
+clean_root:
+	@echo Cleaning sysroot
+	@rm -rf $(SYSROOT)/*
 
 
 include include/mk/compile.mk
@@ -43,13 +49,16 @@ $(DIRS):
 
 
 mbr:
-	@(cd $(ROOT)/src/boot && env make mbr)
+	@(cd $(ROOT)/src/boot/$(ARCH) && env make mbr)
 stage1:
-	@(cd $(ROOT)/src/boot && env make stage1)
+	@(cd $(ROOT)/src/boot/$(ARCH) && env make stage1)
 stage2:
-	@(cd $(ROOT)/src/boot && env make stage2)
-kernel:
-	@(cd $(ROOT)/src/kernel && env make)
+	@(cd $(ROOT)/src/boot/$(ARCH) && env make stage2)
+# FIXME: kernel depends on headers in stage2
+kernel: libc stage2
+	@(cd $(ROOT)/src/kernel && env make kernel install)
+libc:
+	@(cd $(ROOT)/src/libc && env make all install)
 
 
 # only used in GDB
@@ -92,4 +101,4 @@ $(ISO): mbr $(BOOTPART) $(EXTPART)
 		"$(BOOTPART):13::y" "$(EXTPART):linux"
 
 
-.PHONY: all clean dirs debug structs mbr stage1 stage2 iso
+.PHONY: all clean dirs debug structs mbr stage1 stage2 kernel libc iso

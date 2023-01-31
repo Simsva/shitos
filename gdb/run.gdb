@@ -60,7 +60,7 @@ end
 
 # debug kernel
 define debug_kernel
-  file bin/shitos_dbg.elf
+  file bin/shitos.elf
   arch_pm
 
   break kmain
