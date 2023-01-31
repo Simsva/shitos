@@ -52,7 +52,7 @@ mbr:
 	@(cd $(ROOT)/src/boot/$(ARCH) && env make mbr)
 stage1:
 	@(cd $(ROOT)/src/boot/$(ARCH) && env make stage1)
-stage2:
+stage2: libc
 	@(cd $(ROOT)/src/boot/$(ARCH) && env make stage2)
 # FIXME: kernel depends on headers in stage2
 kernel: libc stage2

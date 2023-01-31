@@ -1,7 +1,7 @@
 #ifndef GDT_H_
 #define GDT_H_
 
-#include <sys/stdint.h>
+#include <stdint.h>
 
 #define GDT_SIZE 5
 

@@ -1,6 +1,6 @@
-#include <sys/string.h>
 #include <sys/utils.h>
 #include <boot/def.h>
+#include <string.h>
 #include <elf.h>
 
 #include "gdt.h"

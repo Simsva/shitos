@@ -1,7 +1,7 @@
 #ifndef I386_IRQ_H_
 #define I386_IRQ_H_
 
-#include <sys/stdint.h>
+#include <stdint.h>
 
 #include "idt.h"
 

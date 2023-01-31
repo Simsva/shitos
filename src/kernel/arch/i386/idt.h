@@ -1,7 +1,7 @@
 #ifndef I386_IDT_H_
 #define I386_IDT_H_
 
-#include <sys/stdint.h>
+#include <stdint.h>
 
 #define IDT_SIZE 0x100
 

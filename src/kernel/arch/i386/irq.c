@@ -1,7 +1,7 @@
 #include "irq.h"
 
 #include <sys/utils.h>
-#include <sys/stddef.h>
+#include <stddef.h>
 
 /* PIC1 = master PIC and PIC2 = slave PIC */
 #define PIC1_CMD        0x20

@@ -1,6 +1,6 @@
 #include "isr.h"
 
-#include <sys/stdint.h>
+#include <stdint.h>
 
 #include "idt.h"
 

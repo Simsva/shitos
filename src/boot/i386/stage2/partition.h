@@ -1,7 +1,7 @@
 #ifndef PARTITION_H_
 #define PARTITION_H_
 
-#include <sys/stdint.h>
+#include <stdint.h>
 
 #define MAX_BLK_SIZE 4096 /* maximum supported ext2 block size */
 

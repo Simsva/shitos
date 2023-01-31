@@ -1,7 +1,7 @@
 #ifndef TM_IO_H_
 #define TM_IO_H_
 
-#include <sys/stdint.h>
+#include <stdint.h>
 
 #define TM_WIDTH  (80)
 #define TM_HEIGHT (25)

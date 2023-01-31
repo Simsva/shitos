@@ -1,7 +1,7 @@
 #ifndef BOOT_OPTS_H_
 #define BOOT_OPTS_H_
 
-#include <sys/stdint.h>
+#include <stdint.h>
 
 /* boot options */
 #define HAS_OPT(x)   (boot_options&x)

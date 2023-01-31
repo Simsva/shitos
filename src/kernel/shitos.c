@@ -1,7 +1,7 @@
 #include <boot/def.h>
 #include <boot/boot_opts.h>
-#include <sys/stdint.h>
 #include <sys/utils.h>
+#include <stdint.h>
 
 #include <stdio.h>
 

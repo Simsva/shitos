@@ -1,7 +1,7 @@
 #ifndef EXT2_FS_H_
 #define EXT2_FS_H_
 
-#include <sys/stdint.h>
+#include <stdint.h>
 
 /* superblock */
 #define EXT2_STATE_CLEAN  1

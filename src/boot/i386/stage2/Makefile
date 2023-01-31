@@ -1,8 +1,10 @@
 ROOT=../../../../
 include $(ROOT)/include/mk/def_flags.mk
 include $(ROOT)/include/mk/programs.mk
-CPPFLAGS+=-Iinclude -Iinclude_private
 CFLAGS+=-ffreestanding
+CPPFLAGS+=-Iinclude
+
+LDFLAGS+=-nostdlib -lk -lgcc
 
 STAGE2=$(ROOT)/bin/stage2.bin
 STAGE2_ELF=$(STAGE2:.bin=.elf)
@@ -28,13 +30,15 @@ include $(ROOT)/include/mk/compile.mk
 
 stage2: $(STAGE2) $(STAGE2_ELF)
 $(STAGE2): $(STAGE2_OBJ)
-	@echo "LD	$(shell basename $(STAGE2))"
-	@$(LD) -o $(STAGE2) $^ $(LDFLAGS) -T$(STAGE2_LD)
+	@echo "LD	$(shell basename $@)"
+# NOTE: for some reason LD fails to link to libk
+#	@$(LD) -o $@ $^ $(LDFLAGS) -T$(STAGE2_LD)
+	@$(CC) -o $@ $(CFLAGS) $^ $(LDFLAGS) -T$(STAGE2_LD)
 # used for debugging
 $(STAGE2_ELF): $(STAGE2_OBJ)
-	@echo "LD	$(shell basename $(STAGE2_ELF))"
-	@$(LD) -o $(STAGE2_ELF) $^ $(LDFLAGS) -T$(STAGE2_LD) \
-		--oformat=elf32-i386
+	@echo "LD	$(shell basename $@)"
+#	@$(LD) -o $@ $^ $(LDFLAGS) -T$(STAGE2_LD) --oformat=elf32-i386
+	@$(CC) -Wl,--oformat=elf32-i386 -o $@ $(CFLAGS) $^ $(LDFLAGS) -T$(STAGE2_LD)
 
 
 install: install_headers

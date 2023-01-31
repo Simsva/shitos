@@ -1,7 +1,7 @@
 #ifndef BOOT_DEF_H_
 #define BOOT_DEF_H_
 
-#include <sys/stdint.h>
+#include <stdint.h>
 
 struct kernel_args {
     uint16_t tm_cursor;

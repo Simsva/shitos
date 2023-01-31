@@ -1,7 +1,7 @@
 #ifndef SYS_UTILS_H_
 #define SYS_UTILS_H_
 
-#include <sys/stdint.h>
+#include <stdint.h>
 
 #ifndef asm
 # define asm __asm__ volatile

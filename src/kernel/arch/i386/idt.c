@@ -1,6 +1,6 @@
 #include "idt.h"
 
-#include <sys/string.h>
+#include <string.h>
 
 extern void _idt_load();
 

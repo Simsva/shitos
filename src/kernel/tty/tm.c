@@ -1,7 +1,7 @@
 #include "tm.h"
 
 #include <sys/utils.h>
-#include <sys/string.h>
+#include <string.h>
 
 #include "ansi_codes.h"
 

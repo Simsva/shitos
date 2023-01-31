@@ -2,7 +2,7 @@ ROOT=../../
 include $(ROOT)/include/mk/def_flags.mk
 include $(ROOT)/include/mk/programs.mk
 CFLAGS+=-ffreestanding
-CPPFLAGS+=-Iinclude -Iinclude_private
+CPPFLAGS+=-Iinclude
 
 LDFLAGS+=-nostdlib -lk -lgcc
 
@@ -30,7 +30,7 @@ include $(ROOT)/include/mk/compile.mk
 
 kernel: $(KERNEL)
 $(KERNEL): $(KERNEL_OBJ)
-	@echo "LD	$(shell basename $(KERNEL))"
+	@echo "LD	$(shell basename $@)"
 # NOTE: for some reason LD fails to link to libk
 #	$(LD) -T$(KERNEL_LD) -o $@ $^ $(LDFLAGS)
 	@$(CC) -T$(KERNEL_LD) -o $@ $(CFLAGS) $^ $(LDFLAGS)
@@ -45,6 +45,8 @@ install_kernel: $(KERNEL)
 	@echo "Installing kernel"
 	@mkdir -p $(SYSROOT)
 	@cp -R --preserve=timestamps $(KERNEL) $(SYSROOT)
+# strip symbols from production kernel
+	@$(STRIP) $(SYSROOT)/$(shell basename $(KERNEL))
 
 
 -include $(KERNEL_SRC_MAKE)

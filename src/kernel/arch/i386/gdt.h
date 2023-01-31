@@ -1,7 +1,7 @@
 #ifndef I386_GDT_H_
 #define I386_GDT_H_
 
-#include <sys/stdint.h>
+#include <stdint.h>
 
 #define GDT_SIZE 7
 

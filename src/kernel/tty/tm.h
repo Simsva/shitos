@@ -1,7 +1,7 @@
 #ifndef TTY_TM_H_
 #define TTY_TM_H_
 
-#include <sys/stdint.h>
+#include <stdint.h>
 
 extern uint8_t tm_cur_x, tm_cur_y;
 
