@@ -1,5 +1,5 @@
-#ifndef TTY_TM_H_
-#define TTY_TM_H_
+#ifndef KERNEL_TTY_TM_H_
+#define KERNEL_TTY_TM_H_
 
 #include <stdint.h>
 
@@ -14,4 +14,4 @@ void tm_clear(uint8_t mode);
 void tm_clear_line(uint8_t mode);
 void tm_sgr(uint8_t mode);
 
-#endif // TTY_TM_H_
+#endif // KERNEL_TTY_TM_H_

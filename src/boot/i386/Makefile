@@ -50,6 +50,8 @@ $(STAGE1_ELF): $(STAGE1_OBJ)
 
 stage2:
 	@(cd $(ROOT)/src/boot/$(ARCH)/stage2 && env make stage2 install)
+install_headers:
+	@(cd $(ROOT)/src/boot/$(ARCH)/stage2 && env make install_headers)
 
 
 .PHONY: all clean mbr stage1 stage2

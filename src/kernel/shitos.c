@@ -11,12 +11,7 @@
 #include "arch/i386/irq.h"
 #include "arch/i386/isr.h"
 
-#include "tty/tm.h"
-
-void puts(char *s) {
-    char c;
-    while((c = *s++)) tm_putc(c);
-}
+#include <kernel/tty/tm.h>
 
 void itos(char *buf, uint8_t num, uint8_t len) {
     do
@@ -39,24 +34,24 @@ void kmain(struct kernel_args args) {
     isrs_install();
     asm("sti");
 
-    puts("puts in kmain\n");
+    puts("puts in kmain");
 
     uint8_t i, j, n;
     char buf[4] = { '\0' };
 
-    puts("SGR test:\n");
+    puts("SGR test:");
     for(i = 0; i < 11; ++i) {
         for(j = 0; j < 10; ++j) {
             n = 10 * i + j;
             if(n > 108) break;
             itos(buf, n, 3);
-            puts("\033["); puts(buf); puts("m ");
-            puts(buf); puts("\033[m");
+            printf("\033["); printf(buf); printf("m ");
+            printf(buf); printf("\033[m");
         }
-        tm_putc('\n');
+        putchar('\n');
     }
 
-    tm_putc('0' + test(1,3));
+    putchar('a');
 
     for(;;) asm("hlt");
 }

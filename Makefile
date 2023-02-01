@@ -48,16 +48,20 @@ $(DIRS):
 	@mkdir -p $@
 
 
-mbr:
+headers:
+	@(cd $(ROOT)/src/boot/$(ARCH) && env make install_headers)
+	@(cd $(ROOT)/src/kernel && env make install_headers)
+	@(cd $(ROOT)/src/libc && env make install_headers)
+mbr: headers
 	@(cd $(ROOT)/src/boot/$(ARCH) && env make mbr)
-stage1:
+stage1: headers
 	@(cd $(ROOT)/src/boot/$(ARCH) && env make stage1)
-stage2: libc
+stage2: headers libc
 	@(cd $(ROOT)/src/boot/$(ARCH) && env make stage2)
 # FIXME: kernel depends on headers in stage2
-kernel: libc stage2
+kernel: headers libc
 	@(cd $(ROOT)/src/kernel && env make kernel install)
-libc:
+libc: headers
 	@(cd $(ROOT)/src/libc && env make all install)
 
 
