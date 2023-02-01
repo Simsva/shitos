@@ -38,4 +38,6 @@
 
 #define MB_LEN_MAX (1)
 
+#define NL_ARGMAX  (9)
+
 #endif // LIMITS_H_

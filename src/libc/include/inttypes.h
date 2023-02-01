@@ -131,7 +131,7 @@ extern "C" {
 #define SCNdLEAST64 __PRI64 "d"
 
 #define SCNdFAST8  "hhd"
-#define SCNdFAST16 "d"
+#define SCNdFAST16 "hd"
 #define SCNdFAST32 "d"
 #define SCNdFAST64 __PRI64 "d"
 
@@ -146,7 +146,7 @@ extern "C" {
 #define SCNiLEAST64 __PRI64 "i"
 
 #define SCNiFAST8  "hhi"
-#define SCNiFAST16 "i"
+#define SCNiFAST16 "hi"
 #define SCNiFAST32 "i"
 #define SCNiFAST64 __PRI64 "i"
 
@@ -161,7 +161,7 @@ extern "C" {
 #define SCNoLEAST64 __PRI64 "o"
 
 #define SCNoFAST8  "hho"
-#define SCNoFAST16 "o"
+#define SCNoFAST16 "ho"
 #define SCNoFAST32 "o"
 #define SCNoFAST64 __PRI64 "o"
 
@@ -176,7 +176,7 @@ extern "C" {
 #define SCNuLEAST64 __PRI64 "u"
 
 #define SCNuFAST8  "hhu"
-#define SCNuFAST16 "u"
+#define SCNuFAST16 "hu"
 #define SCNuFAST32 "u"
 #define SCNuFAST64 __PRI64 "u"
 
@@ -191,7 +191,7 @@ extern "C" {
 #define SCNxLEAST64 __PRI64 "x"
 
 #define SCNxFAST8  "hhx"
-#define SCNxFAST16 "x"
+#define SCNxFAST16 "hx"
 #define SCNxFAST32 "x"
 #define SCNxFAST64 __PRI64 "x"
 
