@@ -44,7 +44,7 @@ void kb_handler(struct int_regs *);
 void reboot(void);
 void boot(void);
 
-extern void call_kmain(void *, size_t, struct kernel_args);
+extern void call_kernel(void *, size_t, struct kernel_args);
 
 /* global vars */
 void *global_esp;
@@ -259,7 +259,7 @@ void boot(void) {
     void *elf_off;
     Elf32_Ehdr *elf_hdr;
     Elf32_Phdr *elf_phdr;
-    void (*kmain)(struct kernel_args);
+    void *kernel_entry;
     uint16_t i;
     uint8_t drive_num = *((uint8_t *)MEM_DRV);
     int8_t err;
@@ -331,9 +331,9 @@ found:
                       (elf_phdr->p_flags&PF_X) ? 'x' : '-');
 
         if(elf_phdr->p_type == PT_LOAD) {
-            memcpy((void *)elf_phdr->p_vaddr, elf_off + elf_phdr->p_offset,
+            memcpy((void *)elf_phdr->p_paddr, elf_off + elf_phdr->p_offset,
                    elf_phdr->p_filesz);
-            memset((void *)elf_phdr->p_vaddr + elf_phdr->p_filesz, 0,
+            memset((void *)elf_phdr->p_paddr + elf_phdr->p_filesz, 0,
                    elf_phdr->p_memsz - elf_phdr->p_filesz);
         }
 
@@ -341,10 +341,10 @@ found:
     }
 
     tm_puts("Calling kmain");
-    kmain = (void *)elf_hdr->e_entry;
+    kernel_entry = (void *)elf_hdr->e_entry;
 
     /* call kmain with a known environment */
-    call_kmain(kmain, sizeof(struct kernel_args), (struct kernel_args){
+    call_kernel(kernel_entry, sizeof(struct kernel_args), (struct kernel_args){
         .tm_cursor = tm_cursor,
         .boot_options = boot_options,
         .drive_num = drive_num,

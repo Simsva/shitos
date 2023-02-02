@@ -63,6 +63,7 @@ define debug_kernel
   file bin/shitos.elf
   arch_pm
 
+  break *(void *)&_start
   break kmain
   continue
 end
