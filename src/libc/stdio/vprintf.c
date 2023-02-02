@@ -104,7 +104,7 @@ static void pop_arg(union arg *arg, int type, va_list *ap) {
 static int getint(char **s) {
     int i;
     for(i = 0; isdigit(**s); (*s)++) {
-        if(i > INT_MAX/10U || **s - '0' > INT_MAX-10*i) i = -1;
+        if((unsigned)i > INT_MAX/10U || **s - '0' > INT_MAX-10*i) i = -1;
         else i = 10*i + (**s - '0');
     }
     return i;
@@ -118,8 +118,8 @@ static void pad(char c, int w, int l, int fl) {
     char pad[256];
     if(fl & (F_LEFT_ADJ | F_ZERO_PAD) || l >= w) return;
     l = w - l;
-    memset(pad, c, (l > sizeof pad) ? sizeof pad : l);
-    for(; l >= sizeof pad; l -= sizeof pad)
+    memset(pad, c, (size_t)l > sizeof pad ? sizeof pad : (size_t)l);
+    for(; (unsigned)l >= sizeof pad; l -= sizeof pad)
         output(pad, sizeof(pad));
     output(pad, l);
 }
@@ -154,7 +154,6 @@ static int printf_core(const char *fmt, va_list *ap, union arg *nl_arg, int *nl_
     int argi;
     unsigned st, ps;
     int cnt = 0, l = 0;
-    size_t i;
     char buf[sizeof(uintmax_t)*3];
     const char *prefix;
     int t, pl;
@@ -263,9 +262,10 @@ static int printf_core(const char *fmt, va_list *ap, union arg *nl_arg, int *nl_
             }
             continue;
         case 'p':
-            p = MAX(p, 2*sizeof(void *));
+            p = MAX((unsigned)p, 2*sizeof(void *));
             t = 'x';
             fl |= F_ALT_FORM;
+            __attribute__((fallthrough));
         case 'x': case 'X':
             a = fmt_x(arg.i, z, t&32);
             if(arg.i && (fl & F_ALT_FORM)) prefix += (t>>4), pl=2;
@@ -338,7 +338,7 @@ overflow:
 
 int vprintf(const char *restrict fmt, va_list ap) {;
     int nl_type[NL_ARGMAX+1] = { 0 };
-    union arg nl_arg[NL_ARGMAX+1];
+    union arg nl_arg[NL_ARGMAX+1] = { 0 };
     int r;
 
     r = printf_core(fmt, &ap, nl_arg, nl_type);
