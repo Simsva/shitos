@@ -36,23 +36,19 @@ void kmain(struct kernel_args args) {
 
     puts("puts in kmain");
 
-    /* uint8_t i, j, n; */
-    /* char buf[4] = { '\0' }; */
-
-    /* puts("SGR test:"); */
-    /* for(i = 0; i < 11; ++i) { */
-    /*     for(j = 0; j < 10; ++j) { */
-    /*         n = 10 * i + j; */
-    /*         if(n > 108) break; */
-    /*         itos(buf, n, 3); */
-    /*         printf("\033["); printf(buf); printf("m "); */
-    /*         printf(buf); printf("\033[m"); */
-    /*     } */
-    /*     putchar('\n'); */
-    /* } */
+    uint8_t i, j, n;
+    puts("SGR test:");
+    for(i = 0; i < 11; ++i) {
+        for(j = 0; j < 10; ++j) {
+            n = 10 * i + j;
+            if(n > 108) break;
+            printf("\033[%1$dm%1$4d\033[m", n);
+        }
+        putchar('\n');
+    }
 
     printf("hex %#x\n", 0xdeadbeef);
-    printf("test d:%4d s:%s x:%#-6x (%o)\n", -42, "hello", 0x42, 0755);
+    printf("test d:%1$4d s:%2$s x:%3$#-6x (%3$o)\n", -42, "hello", 0x42);
 
     for(;;) asm("hlt");
 }

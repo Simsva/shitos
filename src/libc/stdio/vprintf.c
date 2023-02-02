@@ -110,18 +110,20 @@ static int getint(char **s) {
     return i;
 }
 
-static void output(const char *s, int l) {
+static void output(int f, const char *s, int l) {
+    if(!f) return;
     while(l-- > 0) putchar(*s++);
 }
 
-static void pad(char c, int w, int l, int fl) {
+static void pad(int f, char c, int w, int l, int fl) {
+    if(!f) return;
     char pad[256];
     if(fl & (F_LEFT_ADJ | F_ZERO_PAD) || l >= w) return;
     l = w - l;
     memset(pad, c, (size_t)l > sizeof pad ? sizeof pad : (size_t)l);
     for(; (unsigned)l >= sizeof pad; l -= sizeof pad)
-        output(pad, sizeof(pad));
-    output(pad, l);
+        output(f, pad, sizeof(pad));
+    output(f, pad, l);
 }
 
 static const char xdigits[16] = {
@@ -145,7 +147,8 @@ static char *fmt_u(uintmax_t x, char *s) {
     return s;
 }
 
-static int printf_core(const char *fmt, va_list *ap, union arg *nl_arg, int *nl_type) {
+/* TODO: replace f with FILE * */
+static int printf_core(int f, const char *fmt, va_list *ap, union arg *nl_arg, int *nl_type) {
     char *a, *z, *s = (char *)fmt;
     unsigned l10n = 0;
     uint32_t fl;
@@ -154,6 +157,7 @@ static int printf_core(const char *fmt, va_list *ap, union arg *nl_arg, int *nl_
     int argi;
     unsigned st, ps;
     int cnt = 0, l = 0;
+    size_t i;
     char buf[sizeof(uintmax_t)*3];
     const char *prefix;
     int t, pl;
@@ -170,7 +174,7 @@ static int printf_core(const char *fmt, va_list *ap, union arg *nl_arg, int *nl_
         for(z = s; s[0]=='%' && s[1] == '%'; z++, s+=2);
         if(z-a > INT_MAX-cnt) goto overflow;
         l = z-a;
-        output(a, l);
+        if(f) output(f, a, l);
         if(l) continue;
 
         if(isdigit(s[1]) && s[2] == '$') {
@@ -194,7 +198,7 @@ static int printf_core(const char *fmt, va_list *ap, union arg *nl_arg, int *nl_
                 w = nl_arg[s[1] - '0'].i;
                 s += 3;
             } else if(!l10n) {
-                w = va_arg(*ap, int);
+                w = f ? va_arg(*ap, int) : 0;
                 s++;
             } else goto inval;
             if(w < 0) fl |= F_LEFT_ADJ, w = -w;
@@ -207,7 +211,7 @@ static int printf_core(const char *fmt, va_list *ap, union arg *nl_arg, int *nl_
                 p = nl_arg[s[2] - '0'].i;
                 s += 4;
             } else if(!l10n) {
-                p = va_arg(*ap, int);
+                p = f ? va_arg(*ap, int) : 0;
                 s += 2;
             } else goto inval;
             xp = (p >= 0);
@@ -234,7 +238,8 @@ static int printf_core(const char *fmt, va_list *ap, union arg *nl_arg, int *nl_
             if(argi >= 0) goto inval;
         } else {
             if(argi >= 0) nl_type[argi] = st, arg = nl_arg[argi];
-            else pop_arg(&arg, st, ap);
+            else if(f) pop_arg(&arg, st, ap);
+            else return 0;
         }
 
         z = buf + sizeof(buf);
@@ -317,17 +322,25 @@ static int printf_core(const char *fmt, va_list *ap, union arg *nl_arg, int *nl_
         if(w < pl+p) w = pl+p;
         if(w > INT_MAX-cnt) goto overflow;
 
-        pad(' ', w, pl+p, fl);
-        output(prefix, pl);
-        pad('0', w, pl+p, fl^F_ZERO_PAD);
-        pad('0', p, z-a, 0);
-        output(a, z-a);
-        pad(' ', w, pl+p, fl^F_LEFT_ADJ);
+        pad(f, ' ', w, pl+p, fl);
+        output(f, prefix, pl);
+        pad(f, '0', w, pl+p, fl^F_ZERO_PAD);
+        pad(f, '0', p, z-a, 0);
+        output(f, a, z-a);
+        pad(f, ' ', w, pl+p, fl^F_LEFT_ADJ);
 
         l = w;
     }
 
-    return cnt;
+    if(f) return cnt;
+    if(!l10n) return 0;
+
+    /* read nl args */
+    for(i = 1; i <= NL_ARGMAX && nl_type[i]; i++)
+        pop_arg(nl_arg+i, nl_type[i], ap);
+    for(; i <= NL_ARGMAX && !nl_type[i]; i++);
+    if(i <= NL_ARGMAX) goto inval;
+    return 1;
 
     /* TODO: errno */
 inval:
@@ -336,12 +349,21 @@ overflow:
     return EOF;
 }
 
-int vprintf(const char *restrict fmt, va_list ap) {;
+int vprintf(const char *restrict fmt, va_list ap) {
+    va_list ap2;
     int nl_type[NL_ARGMAX+1] = { 0 };
     union arg nl_arg[NL_ARGMAX+1] = { 0 };
     int r;
 
-    r = printf_core(fmt, &ap, nl_arg, nl_type);
+    /* musl libc told me this was a good idea */
+    va_copy(ap2, ap);
+    if(printf_core(0, fmt, &ap2, nl_arg, nl_type) < 0) {
+        va_end(ap2);
+        return -1;
+    }
 
+    r = printf_core(1, fmt, &ap2, nl_arg, nl_type);
+
+    va_end(ap2);
     return r;
 }
