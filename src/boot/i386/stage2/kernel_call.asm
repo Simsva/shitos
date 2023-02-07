@@ -1,6 +1,6 @@
 bits 32
 
-    %define KERN_ARGS 0x20000   ; always at the beginning of the binary
+    %define KERN_ARGS 0x100000   ; always at the beginning of the binary
 
 section .text
 

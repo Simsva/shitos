@@ -2,7 +2,7 @@ OUTPUT_FORMAT("elf32-i386")
 ENTRY(_start)
 SECTIONS
 {
-    . = 0x20000;
+    . = 0x100000;
     .low.text : {
         _kernel_lowtext_start = .;
         *(.low.data)

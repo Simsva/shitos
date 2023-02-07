@@ -116,7 +116,7 @@ file_found:
 
     /* HACK: check if the ELF file contents overlap with its location when
      * loaded. Really jank + hardcoded; will probably remove later */
-    if((uint32_t)(*elf_addr+root_inode.i_size) >= 0x20000)
+    if((uint32_t)(*elf_addr+root_inode.i_size) >= 0x100000)
         return PARSE_EXT2_TOOBIG;
     return PARSE_EXT2_SUCCESS;
 }
