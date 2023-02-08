@@ -2,8 +2,8 @@ bits 32
 
     %define KERNEL_MAP 0xc0000000
     %define PD_IND(x) ((x) >> 22)
-    %define PT_START (pt1 - KERNEL_MAP)
-    %define PD_START (pd - KERNEL_MAP)
+    %define PT_START (entry_pt - KERNEL_MAP)
+    %define PD_START (entry_pd - KERNEL_MAP)
 
 extern gdt_install
 extern idt_install
@@ -37,6 +37,11 @@ _start:
     or edx, 0x3
     mov DWORD [PD_START + 4*PD_IND(0)], edx
     mov DWORD [PD_START + 4*PD_IND(KERNEL_MAP)], edx
+
+    ;; test page
+    mov edx, PT_START + 0x1000
+    or edx, 0x3
+    mov DWORD [PD_START + 4], edx
 
     ;; long boilerplateish paging things for ELF sections
     mov esi, 0
@@ -149,8 +154,9 @@ _highstart:
 section .bss
 
 align 0x1000
-pd: resb 0x1000
-pt1: resb 0x1000
+entry_pd:   resb 0x1000
+entry_pt:   resb 0x1000
+test_pt:    resb 0x1000
 
 stack_bottom:
     resb 0x4000                 ; 16 KiB
