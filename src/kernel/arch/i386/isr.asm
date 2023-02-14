@@ -34,34 +34,42 @@ global _isr80
 
 _isr00:
     cli
+    push byte 0
     push byte 0x00
     jmp isr_common_stub
 _isr01:
     cli
+    push byte 0
     push byte 0x01
     jmp isr_common_stub
 _isr02:
     cli
+    push byte 0
     push byte 0x02
     jmp isr_common_stub
 _isr03:
     cli
+    push byte 0
     push byte 0x03
     jmp isr_common_stub
 _isr04:
     cli
+    push byte 0
     push byte 0x04
     jmp isr_common_stub
 _isr05:
     cli
+    push byte 0
     push byte 0x05
     jmp isr_common_stub
 _isr06:
     cli
+    push byte 0
     push byte 0x06
     jmp isr_common_stub
 _isr07:
     cli
+    push byte 0
     push byte 0x07
     jmp isr_common_stub
 _isr08:
@@ -70,6 +78,7 @@ _isr08:
     jmp isr_common_stub
 _isr09:
     cli
+    push byte 0
     push byte 0x09
     jmp isr_common_stub
 _isr0a:
@@ -94,70 +103,87 @@ _isr0e:
     jmp isr_common_stub
 _isr0f:
     cli
+    push byte 0
     push byte 0x0f
     jmp isr_common_stub
 _isr10:
     cli
+    push byte 0
     push byte 0x10
     jmp isr_common_stub
 _isr11:
     cli
+    push byte 0
     push byte 0x11
     jmp isr_common_stub
 _isr12:
     cli
+    push byte 0
     push byte 0x12
     jmp isr_common_stub
 _isr13:
     cli
+    push byte 0
     push byte 0x13
     jmp isr_common_stub
 _isr14:
     cli
+    push byte 0
     push byte 0x14
     jmp isr_common_stub
 _isr15:
     cli
+    push byte 0
     push byte 0x15
     jmp isr_common_stub
 _isr16:
     cli
+    push byte 0
     push byte 0x16
     jmp isr_common_stub
 _isr17:
     cli
+    push byte 0
     push byte 0x17
     jmp isr_common_stub
 _isr18:
     cli
+    push byte 0
     push byte 0x18
     jmp isr_common_stub
 _isr19:
     cli
+    push byte 0
     push byte 0x19
     jmp isr_common_stub
 _isr1a:
     cli
+    push byte 0
     push byte 0x1a
     jmp isr_common_stub
 _isr1b:
     cli
+    push byte 0
     push byte 0x1b
     jmp isr_common_stub
 _isr1c:
     cli
+    push byte 0
     push byte 0x1c
     jmp isr_common_stub
 _isr1d:
     cli
+    push byte 0
     push byte 0x1d
     jmp isr_common_stub
 _isr1e:
     cli
+    push byte 0
     push byte 0x1e
     jmp isr_common_stub
 _isr1f:
     cli
+    push byte 0
     push byte 0x1f
     jmp isr_common_stub
 
@@ -185,7 +211,7 @@ isr_common_stub:
     mov gs, ax
 
     popa
-    add esp, 4                  ; clean up after int_no
+    add esp, 8                  ; clean up after int_no and err_code
 
     sti
     iret

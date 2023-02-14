@@ -12,7 +12,7 @@ struct int_regs {
     /* pushed by pusha */
     uint32_t edi, esi, ebp, esp, ebx, edx, ecx, eax;
     /* interrupt number pushed in each isr */
-    uint32_t int_no;
+    uint32_t int_no, err_code;
     /* pushed automatically on interrupt */
     uint32_t eip, cs, eflags;
 };

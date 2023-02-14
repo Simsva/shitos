@@ -1,0 +1,1 @@
+void *kmem_head;

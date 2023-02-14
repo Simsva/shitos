@@ -13,5 +13,6 @@
 void *vmem_get_paddr(void *vaddr);
 void vmem_map(void *paddr, void *vaddr, uint8_t flags);
 void vmem_unmap(void *vaddr);
+void vmem_init(void);
 
 #endif // KERNEL_VMEM_H_

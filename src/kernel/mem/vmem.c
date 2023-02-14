@@ -28,3 +28,12 @@ void vmem_unmap(void *vaddr) {
     puts("vmem_unmap not implemented for the current architecture");
 #endif
 }
+
+/* initialize everything necessary for virtual memory and allocation */
+void vmem_init(void) {
+#if _ARCH == i386
+    i386_init_paging();
+#else
+    puts("vmem_init not implemented for the current architecture");
+#endif
+}

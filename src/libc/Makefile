@@ -2,7 +2,7 @@ ROOT=../../
 include $(ROOT)/include/mk/def_flags.mk
 include $(ROOT)/include/mk/programs.mk
 CFLAGS+=-ffreestanding
-CPPFLAGS+=-Iinclude -D__is_libc
+CPPFLAGS+=-Iinclude -Iinternal -D__is_libc
 ASFLAGS+=
 
 LIBK_CFLAGS=$(CFLAGS)

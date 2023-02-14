@@ -3,7 +3,7 @@ bits 32
     %define KERNEL_MAP 0xc0000000
     %define PD_IND(x) ((x) >> 22)
     %define PT_START (entry_pt - KERNEL_MAP)
-    %define PD_START (entry_pd - KERNEL_MAP)
+    %define PD_START (kernel_pd - KERNEL_MAP)
 
 extern gdt_install
 extern idt_install
@@ -17,6 +17,8 @@ extern _kernel_data_start
 extern _kernel_bss_start
 extern _kernel_end
 
+extern kmem_head
+
 section .low.data
 
 _kernel_args:
@@ -26,93 +28,66 @@ _kernel_args:
 
 section .low.text
 
+extern paging_init
 global _start
 _start:
     cli
 
-    ;; map kernel to 0xc0000000 + _kernel_lowtext_start
-    ;; also identity map it
-    mov edi, PT_START
-    mov edx, edi
-    or edx, 0x3
+    mov esp, 0x9000             ; temporary stack in unused memory
+
+    ;; start memory allocation on the first free page after the kernel
+    mov ebx, _kernel_end - KERNEL_MAP
+    add ebx, 0xfff
+    and ebx, 0xfffff000
+    mov [kmem_head - KERNEL_MAP], ebx ; save start of memory
+
+    ;; allocate frame bitset
+    mov ecx, 0x1000000          ; last frame, TODO: calculate
+    shr ecx, 12+3               ; calculate number of bytes in bitset
+    add ebx, ecx
+    ;; align (all page tables needed will be placed after this)
+    add ebx, 0xfff
+    and ebx, 0xfffff000
+
+    ;; identity map first pt
     mov DWORD [PD_START + 4*PD_IND(0)], edx
-    mov DWORD [PD_START + 4*PD_IND(KERNEL_MAP)], edx
 
-    ;; test page
-    mov edx, PT_START + 0x1000
-    or edx, 0x3
-    mov DWORD [PD_START + 4], edx
+    call paging_init
 
-    ;; long boilerplateish paging things for ELF sections
-    mov esi, 0
-.page_lowtext1:
-    cmp esi, _kernel_lowtext_start
-    jb .page_lowtext2
-    cmp esi, _kernel_text_start - KERNEL_MAP
-    jge .page_text
+    ;; map kernel to 0xc0000000 + _kernel_lowtext_start
+    ;; also identity map the first page table
+;;     mov edi, ebx                ; edi = memory head = page table 1
+;;     mov edx, edi
+;;     or edx, 0x3
+;;     mov DWORD [PD_START + 4*PD_IND(0)], edx
+;;     mov DWORD [PD_START + 4*PD_IND(KERNEL_MAP)], edx
 
-    mov edx, esi
-    or edx, 0x1                 ; present
-    mov DWORD [edi], edx
-.page_lowtext2:
-    add edi, 4
-    add esi, 0x1000
-    jmp .page_lowtext1
+;;     ;; map whole kernel (and needed memory) in page tables
+;;     mov esi, 0
+;; .page_fill1:
+;;     cmp esi, _kernel_lowtext_start
+;;     jb .page_fill2
+;;     cmp esi, ebx + 0x1000       ; map up to last used memory
+;;     jge .end_page
 
-.page_text:
-    cmp esi, _kernel_rodata_start - KERNEL_MAP
-    jge .page_rodata
+;;     mov edx, esi
+;;     or edx, 0x1                 ; present
+;;     mov DWORD [edi], edx
+;; .page_fill2:
+;;     add edi, 4
+;;     add esi, 0x1000
+;;     cmp edi - ebx, 0x1000       ; outside of current pt?
+;;     jb .page_fill3              ; no? continue
+;;     add ebx, 0x1000             ; yes? allocate another pt
+;; .page_fill3:
+;;     jmp .page_fill1
 
-    mov edx, esi
-    or edx, 0x1                 ; present
-    mov DWORD [edi], edx
-
-    add edi, 4
-    add esi, 0x1000
-    jmp .page_text
-
-.page_rodata:
-    cmp esi, _kernel_data_start - KERNEL_MAP
-    jge .page_data
-
-    mov edx, esi
-    or edx, 0x1                 ; present
-    mov DWORD [edi], edx
-
-    add edi, 4
-    add esi, 0x1000
-    jmp .page_rodata
-
-.page_data:
-    cmp esi, _kernel_bss_start - KERNEL_MAP
-    jge .page_bss
-
-    mov edx, esi
-    or edx, 0x3                 ; rw + present
-    mov DWORD [edi], edx
-
-    add edi, 4
-    add esi, 0x1000
-    jmp .page_data
-
-.page_bss:
-    cmp esi, _kernel_end - KERNEL_MAP
-    jge .end_page
-
-    mov edx, esi,
-    or edx, 0x3                 ; rw + present
-    mov DWORD [edi], edx,
-
-    add edi, 4
-    add esi, 0x1000
-    jmp .page_bss
-
-.end_page:
+;; .end_page:
     ;; map VGA text mode memory to 0xc03ff000
     ;; assuming the kernel will not be over 3-4 MiB
-    mov DWORD [PT_START + 0xffc], 0xb8000 | 0x3
+    mov DWORD [PT_START + 0xffc], 0xb8000 | 0x1
     ;; map last PDE to itself
-    mov DWORD [PD_START + 0xffc], PD_START + 0x3 ; same as or but works in nasm
+    mov DWORD [PD_START + 0xffc], PD_START + 0x1 ; same as or but works in nasm
 
     ;; set page directory
     mov eax, PD_START
@@ -120,7 +95,7 @@ _start:
 
     ;; enable paging
     mov eax, cr0
-    or eax, 0x80000000
+    or eax, 0x80010000
     mov cr0, eax
 
     lea eax, _highstart
@@ -153,10 +128,12 @@ _highstart:
 
 section .bss
 
+global kernel_pd
+
 align 0x1000
-entry_pd:   resb 0x1000
+kernel_pd:  resb 0x1000
 entry_pt:   resb 0x1000
-test_pt:    resb 0x1000
+initial_pt: resb 0x1000
 
 stack_bottom:
     resb 0x4000                 ; 16 KiB

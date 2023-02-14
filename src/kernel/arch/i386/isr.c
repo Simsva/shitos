@@ -5,6 +5,7 @@
 #include <ansi.h>
 
 #include "idt.h"
+#include "fault_handlers.h"
 
 extern void _isr00(void);
 extern void _isr01(void);
@@ -117,8 +118,19 @@ const char *exception_msgs[] = {
 };
 
 void _fault_handler(struct int_regs r) {
-    /* NOTE: only interrupt 0x1f and below will call this */
+    switch(r.int_no) {
+    case FAULT_PAGE:
+        _page_fault(&r);
+        goto ret;
+    }
+
+    if(r.int_no >= FAULT_COUNT) return;
+
     printf(ANSI_BG_RED ANSI_FG_BRIGHT_WHITE "int %#x: %s\n",
-           r.int_no, exception_msgs[r.int_no]);
+        r.int_no, exception_msgs[r.int_no]);
     for(;;);
+
+ret:
+    __asm__ volatile(""); /* prevent optimizations that clobber stack */
+    return;
 }
