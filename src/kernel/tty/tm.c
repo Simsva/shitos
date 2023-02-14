@@ -21,7 +21,7 @@
 #define TM_INVERT   0x01
 #define TM_CONCEAL  0x02
 
-static uint16_t *const tm_memory = (uint16_t *)0xc03ff000;
+static uint16_t *const tm_memory = (uint16_t *)0xffbff000;
 uint8_t tm_cur_x, tm_cur_y;
 static uint8_t tm_cur_saved_x = 0, tm_cur_saved_y = 0;
 static uint8_t tm_color = DEFAULT_COLOR, tm_esc_level = LEVEL_NONE;

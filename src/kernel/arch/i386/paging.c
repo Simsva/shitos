@@ -13,7 +13,7 @@
 extern void *kernel_pd;
 
 /* frame bitset */
-uint32_t *frames, nframes;
+uint32_t *frames, frame_count;
 
 #define INDEX_FROM_BIT(a)  (a / sizeof(frames[0]))
 #define OFFSET_FROM_BIT(a) (a % sizeof(frames[0]))
@@ -41,7 +41,7 @@ uint32_t frame_test(uint32_t frame_addr) {
 
 uint32_t frame_find_first() {
     uint32_t i, x;
-    for(i = 0; i < INDEX_FROM_BIT(nframes); i++) {
+    for(i = 0; i < INDEX_FROM_BIT(frame_count); i++) {
         if((x = ffsl(frames[i])))
             return i*sizeof(frames[0]) + x-1;
     }
@@ -105,6 +105,9 @@ not_empty:
 
 extern unsigned _kernel_end;
 void i386_init_paging(void) {
+    /* all this is done in entry.asm now */
+    return;
+
     /* start memory allocation at first page after _kernel_end */
     kmem_head = (void *)(((uintptr_t)&_kernel_end + 0xfff) & 0xfffff000);
     /* kernel_pd = (void *)0xfffff000; */
@@ -112,12 +115,12 @@ void i386_init_paging(void) {
     /* last available page */
     /* TODO: calculate this */
     uint32_t last_frame = 0x1000000;
-    nframes = last_frame >> 12;
+    frame_count = last_frame >> 12;
 
     /* "allocate" memory for the frame bitset */
     frames = kmem_head;
-    kmem_head += INDEX_FROM_BIT(nframes);
-    memset(frames, 0, INDEX_FROM_BIT(nframes));
+    kmem_head += INDEX_FROM_BIT(frame_count);
+    memset(frames, 0, INDEX_FROM_BIT(frame_count));
 }
 
 /* fault */
@@ -127,7 +130,7 @@ void _page_fault(struct int_regs *r) {
 
     printf(ANSI_FG_BRIGHT_WHITE ANSI_BG_RED "Page fault (%s%s%s%s%s) at %p\n",
            r->err_code & 0x1  ? ""          : "not present,",
-           r->err_code & 0x2  ? "ro,"       : "",
+           r->err_code & 0x2  ? "write,"    : "",
            r->err_code & 0x4  ? "user"      : "",
            r->err_code & 0x8  ? "reserved," : "",
            r->err_code & 0x10 ? "instr,"    : "",

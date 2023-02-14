@@ -17,6 +17,8 @@ extern _kernel_data_start
 extern _kernel_bss_start
 extern _kernel_end
 
+extern frames
+extern frame_count
 extern kmem_head
 
 section .low.data
@@ -39,55 +41,20 @@ _start:
     mov ebx, _kernel_end - KERNEL_MAP
     add ebx, 0xfff
     and ebx, 0xfffff000
-    mov [kmem_head - KERNEL_MAP], ebx ; save start of memory
 
     ;; allocate frame bitset
+    mov DWORD [frames - KERNEL_MAP], ebx
     mov ecx, 0x1000000          ; last frame, TODO: calculate
-    shr ecx, 12+3               ; calculate number of bytes in bitset
+    shr ecx, 12                 ; calculate number of frames
+    mov DWORD [frame_count - KERNEL_MAP], ecx
+    shr ecx, 3                  ; calculate number of bytes in bitset
     add ebx, ecx
     ;; align (all page tables needed will be placed after this)
-    add ebx, 0xfff
+    add ebx, 0xfff + 1          ; add one additional byte to the bitset
     and ebx, 0xfffff000
-
-    ;; identity map first pt
-    mov DWORD [PD_START + 4*PD_IND(0)], edx
+    mov DWORD [kmem_head - KERNEL_MAP], ebx ; save start of memory
 
     call paging_init
-
-    ;; map kernel to 0xc0000000 + _kernel_lowtext_start
-    ;; also identity map the first page table
-;;     mov edi, ebx                ; edi = memory head = page table 1
-;;     mov edx, edi
-;;     or edx, 0x3
-;;     mov DWORD [PD_START + 4*PD_IND(0)], edx
-;;     mov DWORD [PD_START + 4*PD_IND(KERNEL_MAP)], edx
-
-;;     ;; map whole kernel (and needed memory) in page tables
-;;     mov esi, 0
-;; .page_fill1:
-;;     cmp esi, _kernel_lowtext_start
-;;     jb .page_fill2
-;;     cmp esi, ebx + 0x1000       ; map up to last used memory
-;;     jge .end_page
-
-;;     mov edx, esi
-;;     or edx, 0x1                 ; present
-;;     mov DWORD [edi], edx
-;; .page_fill2:
-;;     add edi, 4
-;;     add esi, 0x1000
-;;     cmp edi - ebx, 0x1000       ; outside of current pt?
-;;     jb .page_fill3              ; no? continue
-;;     add ebx, 0x1000             ; yes? allocate another pt
-;; .page_fill3:
-;;     jmp .page_fill1
-
-;; .end_page:
-    ;; map VGA text mode memory to 0xc03ff000
-    ;; assuming the kernel will not be over 3-4 MiB
-    mov DWORD [PT_START + 0xffc], 0xb8000 | 0x1
-    ;; map last PDE to itself
-    mov DWORD [PD_START + 0xffc], PD_START + 0x1 ; same as or but works in nasm
 
     ;; set page directory
     mov eax, PD_START
@@ -95,7 +62,7 @@ _start:
 
     ;; enable paging
     mov eax, cr0
-    or eax, 0x80010000
+    or eax, 0x80000000
     mov cr0, eax
 
     lea eax, _highstart
@@ -132,8 +99,6 @@ global kernel_pd
 
 align 0x1000
 kernel_pd:  resb 0x1000
-entry_pt:   resb 0x1000
-initial_pt: resb 0x1000
 
 stack_bottom:
     resb 0x4000                 ; 16 KiB
