@@ -15,8 +15,8 @@ extern void *kernel_pd;
 /* frame bitset */
 uint32_t *frames, frame_count;
 
-#define INDEX_FROM_BIT(a)  (a / sizeof(frames[0]))
-#define OFFSET_FROM_BIT(a) (a % sizeof(frames[0]))
+#define INDEX_FROM_BIT(a)  (a / (8*sizeof(frames[0])))
+#define OFFSET_FROM_BIT(a) (a % (8*sizeof(frames[0])))
 
 void frame_set(uint32_t frame_addr) {
     uint32_t frame = frame_addr >> 12;
@@ -41,10 +41,10 @@ uint32_t frame_test(uint32_t frame_addr) {
 
 uint32_t frame_find_first() {
     uint32_t i, x;
-    for(i = 0; i < INDEX_FROM_BIT(frame_count); i++) {
-        if((x = ffsl(frames[i])))
-            return i*sizeof(frames[0]) + x-1;
-    }
+
+    /* NOTE: skips the first MiB as it contains a lot of reserved memory */
+    for(i = INDEX_FROM_BIT(0x100); i < INDEX_FROM_BIT(frame_count); i++)
+        if((x = ffsl(~frames[i]))) return i*8*sizeof(frames[0]) + x-1;
     return UINT32_MAX;
 }
 
@@ -58,7 +58,6 @@ void *i386_get_paddr(void *vaddr) {
     return (void *)((pt[pti] & ~0xfff) + ((uint32_t)vaddr & 0xfff));
 }
 
-/* NOTE: not usable yet */
 void i386_map_page(void *paddr, void *vaddr, uint8_t flags) {
     uint32_t pdi = (uint32_t)vaddr >> 22;
     uint32_t pti = (uint32_t)vaddr >> 12 & 0x3ff;
@@ -101,26 +100,6 @@ void i386_unmap_page(void *vaddr) {
 not_empty:
 
     asm("mov %%cr3, %%eax; mov %%eax, %%cr3" ::: "%eax");
-}
-
-extern unsigned _kernel_end;
-void i386_init_paging(void) {
-    /* all this is done in entry.asm now */
-    return;
-
-    /* start memory allocation at first page after _kernel_end */
-    kmem_head = (void *)(((uintptr_t)&_kernel_end + 0xfff) & 0xfffff000);
-    /* kernel_pd = (void *)0xfffff000; */
-
-    /* last available page */
-    /* TODO: calculate this */
-    uint32_t last_frame = 0x1000000;
-    frame_count = last_frame >> 12;
-
-    /* "allocate" memory for the frame bitset */
-    frames = kmem_head;
-    kmem_head += INDEX_FROM_BIT(frame_count);
-    memset(frames, 0, INDEX_FROM_BIT(frame_count));
 }
 
 /* fault */

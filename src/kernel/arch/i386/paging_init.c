@@ -5,8 +5,8 @@
 #define FCOUNT (*(uint32_t *)PADDR(&frame_count))
 #define FRAMES (*(uint32_t **)PADDR(&frames))
 #define SET_FRAME(a) \
-    FRAMES[(a) / sizeof(uint32_t)] \
-        |= 1<<((a) % sizeof(uint32_t));
+    FRAMES[(a) / UINT32_WIDTH] \
+        |= 1<<((a) % UINT32_WIDTH);
 
 extern void *kmem_head;
 extern void *kernel_pd;
@@ -14,6 +14,7 @@ extern int *_kernel_lowtext_start;
 extern uint32_t frame_count;
 extern uint32_t *frames;
 
+/* early pre-paging setup */
 __attribute__((section(".low.text"))) void paging_init(void) {
     void *kmem_head_low, *ptbase, *srccur;
     uint32_t *pd, *pdcur, *ptcur, *vga_pt;
@@ -43,7 +44,7 @@ __attribute__((section(".low.text"))) void paging_init(void) {
     for(;;) {
         if(srccur >= (void *)&_kernel_lowtext_start) {
             *ptcur = (uint32_t)srccur | 0x1;
-            SET_FRAME((uint32_t)srccur);
+            SET_FRAME((uint32_t)srccur >> 12);
         }
         if(srccur >= ptbase)
             break;
@@ -65,6 +66,8 @@ __attribute__((section(".low.text"))) void paging_init(void) {
     /* map last PD entry to itself */
     pd[0x3ff] = (uint32_t)pd | 0x1;
 
-    /* save new kmem_head */
-    kmem_head_low = ptbase + 0x1000;
+    /* set frames to vaddr */
+    FRAMES = (void *)FRAMES + KERNEL_MAP;
+    /* save vaddr of new kmem_head */
+    kmem_head_low = ptbase + 0x1000 + KERNEL_MAP;
 }
