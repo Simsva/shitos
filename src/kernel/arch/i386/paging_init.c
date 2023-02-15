@@ -33,12 +33,13 @@ __attribute__((section(".low.text"))) void paging_init(void) {
     /* identity map first page table */
     pd[0] = (uint32_t)ptbase | 0x1;
 
-    *(uint32_t *)(0x100) = (uint32_t)&FCOUNT;
-
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Warray-bounds"
     /* zero out frame bitset, I do not dare use other higher-half functions in
      * this cursed C code, so no memset */
     for(uint32_t i = 0; i < ((FCOUNT+31) >> 5); i++)
         FRAMES[i] = 0;
+#pragma GCC diagnostic pop
 
     *pdcur++ = (uint32_t)ptbase | 0x1;
     for(;;) {
