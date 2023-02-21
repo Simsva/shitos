@@ -5,7 +5,9 @@
 #include <sys/utils.h>
 #include <stdio.h>
 
-#include "arch/i386/paging.h"
+#include <kernel/arch/i386/paging.h>
+
+#include <kernel/ordered_array.h>
 
 #define STR(s) #s
 #define EXPAND_STR(s) STR(s)
@@ -24,8 +26,14 @@ void kmain(struct kernel_args *args) {
 
     printf("first frame: %#x\n", frame_find_first());
 
-    /* NOTE: causes page fault */
-    *(uint32_t *)0x400000 = 0xcafebabe;
+    ord_arr_type_t bruh[8] = { NULL };
+    ord_arr_t test;
+    ord_arr_place(&test, bruh, 8, ord_arr_stdcompar);
+    ord_arr_insert(&test, (ord_arr_type_t)32);
+    ord_arr_insert(&test, (ord_arr_type_t)8);
+    ord_arr_insert(&test, (ord_arr_type_t)16);
+    ord_arr_remove(&test, 1);
+    printf("%#x\n", (uint32_t)ord_arr_get(&test, 1));
 
     for(;;) asm("hlt");
 }

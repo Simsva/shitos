@@ -1,4 +1,4 @@
-#include "paging.h"
+#include <kernel/arch/i386/paging.h>
 
 #include <kernel/kmem.h>
 #include <sys/utils.h>
@@ -77,6 +77,7 @@ void i386_map_page(void *paddr, void *vaddr, uint8_t flags) {
         return;
     }
 
+    frame_set((uint32_t)paddr);
     pt[pti] = (uint32_t)paddr | (flags & 0xfff) | 0x1;
 
     asm("mov %%cr3, %%eax; mov %%eax, %%cr3" ::: "%eax");

@@ -1,7 +1,7 @@
 #include <kernel/vmem.h>
 
 #if _ARCH == i386
-# include "../arch/i386/paging.h"
+# include <kernel/arch/i386/paging.h>
 #endif
 
 void *vmem_get_paddr(void *vaddr) {
