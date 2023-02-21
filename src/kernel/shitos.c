@@ -6,6 +6,7 @@
 #include <stdio.h>
 
 #include "arch/i386/paging.h"
+#include "arch/i386/keyboard.h"
 
 #define STR(s) #s
 #define EXPAND_STR(s) STR(s)
@@ -25,7 +26,10 @@ void kmain(struct kernel_args *args) {
     printf("first frame: %#x\n", frame_find_first());
 
     /* NOTE: causes page fault */
-    *(uint32_t *)0x400000 = 0xcafebabe;
+    //*(uint32_t *)0x400000 = 0xcafebabe;
+    
+    keyboard_install(); 
+
 
     for(;;) asm("hlt");
 }
