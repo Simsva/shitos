@@ -17,19 +17,19 @@ extern uint32_t *frames;
 void kmain(struct kernel_args *args) {
     tm_cur_x = args->tm_cursor % 80;
     tm_cur_y = args->tm_cursor / 80;
-
+    
+    printf("\033[2J\033[H");
     puts("Booting ShitOS (" EXPAND_STR(_ARCH) ")");
 
     printf("nframes: %1$x %1$d\nframes %2$p to %3$p\n",
            frame_count, frames, frames + ((frame_count + 31)>>5));
 
     printf("first frame: %#x\n", frame_find_first());
-
-    /* NOTE: causes page fault */
+    
+        /* NOTE: causes page fault */
     //*(uint32_t *)0x400000 = 0xcafebabe;
     
-    keyboard_install(); 
-
-
+    keyboard_init(); 
+    
     for(;;) asm("hlt");
 }
