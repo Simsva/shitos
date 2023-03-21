@@ -38,7 +38,7 @@ void ord_arr_insert(ord_arr_t *array, ord_arr_type_t el) {
         /* will extend over max_size */
         array->array[array->size++] = el;
     else {
-        memmove(array->array + i+1, array->array + i, array->size - i);
+        memmove(array->array + i+1, array->array + i, (array->size - i) * sizeof(ord_arr_type_t));
         array->array[i] = el;
         array->size++;
     }
@@ -52,5 +52,5 @@ ord_arr_type_t ord_arr_get(ord_arr_t *array, size_t i) {
 void ord_arr_remove(ord_arr_t *array, size_t i) {
     assert(i < array->size);
     array->size--;
-    memmove(array->array + i, array->array + i+1, array->size - i);
+    memmove(array->array + i, array->array + i+1, (array->size - i) * sizeof(ord_arr_type_t));
 }

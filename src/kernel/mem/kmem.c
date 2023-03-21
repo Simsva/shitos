@@ -3,7 +3,6 @@
 
 #include <kernel/vmem.h>
 
-/* TODO: change to paddr */
 void *kmem_head;
 
 void *kmalloc_i(size_t sz, int align) {

@@ -85,12 +85,14 @@ typedef uint64_t           uintmax_t;
 # define INTPTR_MIN    INT32_MIN
 # define INTPTR_MAX    INT32_MAX
 # define UINTPTR_MAX   UINT32_MAX
+# define SIZE_MAX      UINT32_MAX
 #else
 # define INTPTR_WIDTH  INT64_WIDTH
 # define UINTPTR_WIDTH UINT64_WIDTH
 # define INTPTR_MIN    INT64_MIN
 # define INTPTR_MAX    INT64_MAX
 # define UINTPTR_MAX   UINT64_MAX
+# define SIZE_MAX      UINT64_MAX
 #endif
 
 #define INTMAX_WIDTH  INT64_WIDTH

@@ -11,6 +11,7 @@
 
 /* globals */
 extern void *kernel_pd;
+void *buffer_pt;
 
 /* frame bitset */
 uint32_t *frames, frame_count;
@@ -66,9 +67,9 @@ void i386_map_page(void *paddr, void *vaddr, uint8_t flags) {
     uint32_t *pt = (uint32_t *)0xffc00000 + 0x400 * pdi;
 
     if(!(pd[pdi] & 0x1)) {
-        /* TODO: allocate memory for a PT */
-        puts("PD entry not present");
-        return;
+        pd[pdi] = (uint32_t)buffer_pt | 0x1;
+        buffer_pt = NULL;
+        /* TODO: allocate a new buffer */
     }
 
     if(pt[pti] & 0x1) {
@@ -91,6 +92,7 @@ void i386_unmap_page(void *vaddr) {
     uint32_t *pt = (uint32_t *)0xffc00000 + 0x400 * pdi;
 
     if(!(pd[pdi] & 0x1)) return;
+    frame_unset((uint32_t)i386_get_paddr(vaddr));
     pt[pti] = 0;
 
     /* remove PD entry when empty */
