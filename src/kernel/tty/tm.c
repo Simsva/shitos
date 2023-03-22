@@ -58,7 +58,7 @@ void tm_putc(unsigned char c) {
             break;
 
         case C0_HT:
-            tm_cur_x = (tm_cur_x + 7) & ~7;
+            tm_cur_x = (tm_cur_x+1 + 7) & ~7;
             break;
 
         case C0_LF:

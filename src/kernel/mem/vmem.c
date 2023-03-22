@@ -3,6 +3,8 @@
 #include <kernel/kmem.h>
 #include <assert.h>
 #include <stdint.h>
+#include <stdbool.h>
+#include <stdio.h>
 
 #if _ARCH == i386
 # include <kernel/arch/i386/paging.h>
@@ -144,6 +146,8 @@ static size_t vmem_heap_hole_find(vmem_heap_t *heap, size_t size, uint8_t align)
             off = 0;
             if(loc & (PAGE_SIZE-1))
                 off = PAGE_SIZE - (loc & (PAGE_SIZE-1));
+            if(off < sizeof(vmem_header_t)) off += PAGE_SIZE;
+            if(off > hole_sz) continue;
             hole_sz -= off;
         }
         if(hole_sz >= size)
@@ -183,7 +187,7 @@ void *vmem_heap_alloc(vmem_heap_t *heap, size_t size, uint8_t align) {
             hdr->size = heap_newsz - heap_oldsz;
             hdr->hole = 1;
 
-            vmem_footer_t *ftr = (vmem_footer_t *)(heap_oldend + hdr->size - sizeof(vmem_footer_t));
+            vmem_footer_t *ftr = (vmem_footer_t *)((void *)hdr + hdr->size - sizeof(vmem_footer_t));
             ftr->magic = VMEM_HEAP_MAGIC;
             ftr->hdr = hdr;
 
@@ -193,7 +197,7 @@ void *vmem_heap_alloc(vmem_heap_t *heap, size_t size, uint8_t align) {
             hdr->magic = VMEM_HEAP_MAGIC;
             hdr->size += heap_newsz - heap_oldsz;
 
-            vmem_footer_t *ftr = (vmem_footer_t *)(heap_oldend + hdr->size - sizeof(vmem_footer_t));
+            vmem_footer_t *ftr = (vmem_footer_t *)((void *)hdr + hdr->size - sizeof(vmem_footer_t));
             ftr->magic = VMEM_HEAP_MAGIC;
             ftr->hdr = hdr;
         }
@@ -210,6 +214,10 @@ void *vmem_heap_alloc(vmem_heap_t *heap, size_t size, uint8_t align) {
     /* align and create a hole before */
     if(align) {
         uintptr_t off = PAGE_SIZE - ((uintptr_t)orig_header & 0xfff);
+        /* make sure the header fits */
+        if(off < sizeof(vmem_header_t))
+            off += PAGE_SIZE;
+
         void *new_loc = (void *)orig_header + off - sizeof(vmem_header_t);
 
         orig_header->size = off - sizeof(vmem_header_t);
@@ -220,8 +228,8 @@ void *vmem_heap_alloc(vmem_heap_t *heap, size_t size, uint8_t align) {
         footer->magic = VMEM_HEAP_MAGIC;
         footer->hdr = orig_header;
 
-        orig_header = new_loc;
         hole_size -= orig_header->size;
+        orig_header = new_loc;
     } else {
         ord_arr_remove(&heap->index, hole);
     }
@@ -249,4 +257,64 @@ void *vmem_heap_alloc(vmem_heap_t *heap, size_t size, uint8_t align) {
     }
 
     return (void *)orig_header + sizeof(vmem_header_t);
+}
+
+void vmem_heap_free(vmem_heap_t *heap, void *p) {
+    if(p == NULL) return;
+
+    vmem_header_t *hdr = p - sizeof(vmem_header_t);
+    vmem_footer_t *ftr = (void *)hdr + hdr->size - sizeof(vmem_footer_t);
+
+    assert(hdr->magic == VMEM_HEAP_MAGIC);
+    assert(ftr->magic == VMEM_HEAP_MAGIC);
+
+    hdr->hole = 1;
+    bool add_hole = true;
+
+    /* unify left */
+    vmem_footer_t *lftr = (void *)hdr - sizeof(vmem_footer_t);
+    if(lftr->magic == VMEM_HEAP_MAGIC && lftr->hdr->hole) {
+        lftr->hdr->size += hdr->size;
+        hdr = lftr->hdr;
+        ftr->hdr = hdr;
+        add_hole = false; /* already in index */
+    }
+
+    /* unify right */
+    vmem_header_t *rhdr = (void *)ftr + sizeof(vmem_footer_t);
+    if(rhdr->magic == VMEM_HEAP_MAGIC && rhdr->hole) {
+        hdr->size += rhdr->size;
+        ftr = (void *)rhdr + rhdr->size - sizeof(vmem_footer_t);
+        ftr->hdr = hdr;
+
+        size_t idx = 0;
+        while(idx < heap->index.size && ord_arr_get(&heap->index, idx) != rhdr)
+            idx++;
+
+        /* make sure it actually exists */
+        assert(idx < heap->index.size);
+        ord_arr_remove(&heap->index, idx);
+    }
+
+    /* TODO: contract */
+
+    if(add_hole) ord_arr_insert(&heap->index, hdr);
+}
+
+/* dump information about heap segments */
+void vmem_heap_dump(vmem_heap_t *heap) {
+    vmem_header_t *hdr = heap->start;
+
+    while((void *)hdr < heap->end) {
+        if(hdr->magic != VMEM_HEAP_MAGIC) goto magic_err;
+        printf("%p\talloc:%d sz:%#zx\trsz:%#zx\n",
+               hdr, !hdr->hole,
+               hdr->size - sizeof(vmem_header_t) - sizeof(vmem_footer_t),
+               hdr->size);
+        hdr = (void *)hdr + hdr->size;
+    }
+    return;
+
+magic_err:
+    printf("\033[41mSegment at %p not intact!\033[m\n", hdr);
 }

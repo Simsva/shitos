@@ -54,6 +54,7 @@ void vmem_alloc(void *vaddr, uint8_t flags);
 
 void vmem_heap_create(vmem_heap_t *heap, void *start, void *end, void *max);
 void *vmem_heap_alloc(vmem_heap_t *heap, size_t size, uint8_t align);
-void *vmem_heap_free(vmem_heap_t *heap, void *p);
+void vmem_heap_free(vmem_heap_t *heap, void *p);
+void vmem_heap_dump(vmem_heap_t *heap);
 
 #endif // KERNEL_VMEM_H_

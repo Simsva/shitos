@@ -16,11 +16,15 @@ void kmain(struct kernel_args *args) {
     puts("Booting ShitOS (" EXPAND_STR(_ARCH) ")");
 
     void *a, *b, *c;
-    a = vmem_heap_alloc(&kheap, 4*sizeof(uint32_t), 1);
-    b = vmem_heap_alloc(&kheap, 40, 0);
-    c = vmem_heap_alloc(&kheap, 0x1000, 0);
+    a = vmem_heap_alloc(&kheap, 0x8000-sizeof(vmem_footer_t)-2*sizeof(vmem_header_t)+1, 0);
+    c = vmem_heap_alloc(&kheap, 32, 0);
+    b = vmem_heap_alloc(&kheap, 64, 0);
+    vmem_heap_free(&kheap, c);
+    vmem_heap_dump(&kheap);
+    c = vmem_heap_alloc(&kheap, 32, 1);
 
     printf("a:%p\nb:%p\nc:%p\n", a, b, c);
+    vmem_heap_dump(&kheap);
 
     for(;;) asm("hlt");
 }
