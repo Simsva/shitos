@@ -5,6 +5,8 @@
 
 #define I386_PAGE_SIZE 0x1000
 
+extern void *buffer_pt;
+
 void frame_set(uint32_t frame_addr);
 void frame_unset(uint32_t frame_addr);
 uint32_t frame_test(uint32_t frame_addr);
