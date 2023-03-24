@@ -15,7 +15,7 @@ static int vmem_header_compar(ord_arr_type_t a, ord_arr_type_t b);
 static size_t vmem_heap_contract(vmem_heap_t *heap, size_t new_sz);
 static size_t vmem_heap_hole_find(vmem_heap_t *heap, size_t sz, uint8_t align);
 
-vmem_heap_t kheap;
+vmem_heap_t kheap = {0};
 
 void *vmem_get_paddr(void *vaddr) {
 #if _ARCH == i386
