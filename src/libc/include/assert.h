@@ -1,6 +1,7 @@
 #ifndef ASSERT_H_
 #define ASSERT_H_
 
+#include <_cheader.h>
 #include <features.h>
 
 #undef assert
@@ -15,15 +16,10 @@
 #define static_assert _Static_assert
 #endif
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+_BEGIN_C_HEADER
 
 _Noreturn void __assert_fail (const char *, const char *, int, const char *);
 
-#ifdef __cplusplus
-}
-#endif
-
+_END_C_HEADER
 
 #endif // ASSERT_H_

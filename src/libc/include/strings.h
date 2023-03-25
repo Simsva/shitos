@@ -1,11 +1,10 @@
 #ifndef STRINGS_H_
 #define STRINGS_H_
 
+#include <_cheader.h>
 #include <features.h>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+_BEGIN_C_HEADER
 
 typedef __typeof__(sizeof 0) size_t;
 
@@ -13,8 +12,6 @@ int ffs(int);
 int ffsl(long);
 int ffsll(long long);
 
-#ifdef __cplusplus
-}
-#endif
+_END_C_HEADER
 
 #endif // STRINGS_H_

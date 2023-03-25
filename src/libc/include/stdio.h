@@ -1,12 +1,11 @@
 #ifndef STDIO_H_
 #define STDIO_H_
 
+#include <_cheader.h>
 #include <features.h>
 #include <stdarg.h>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+_BEGIN_C_HEADER
 
 #if __cplusplus >= 201103L
 #define NULL nullptr
@@ -26,8 +25,6 @@ int puts(const char *);
 int printf(const char *__restrict, ...) __attribute__((format(printf, 1, 2)));
 int vprintf(const char *__restrict, va_list);
 
-#ifdef __cplusplus
-}
-#endif
+_END_C_HEADER
 
 #endif // STDIO_H_

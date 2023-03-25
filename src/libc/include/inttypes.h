@@ -1,12 +1,11 @@
 #ifndef INTTYPES_H_
 #define INTTYPES_H_
 
+#include <_cheader.h>
 #include <features.h>
 #include <stdint.h>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+_BEGIN_C_HEADER
 
 #if UINTPTR_MAX == UINT64_MAX
 # define __PRI64  "l"
@@ -207,8 +206,6 @@ extern "C" {
 #define SCNuPTR __PRIPTR "u"
 #define SCNxPTR __PRIPTR "x"
 
-#ifdef __cplusplus
-}
-#endif
+_END_C_HEADER
 
 #endif // INTTYPES_H_
