@@ -267,6 +267,7 @@ void vmem_heap_free(vmem_heap_t *heap, void *p) {
 
     assert(hdr->magic == VMEM_HEAP_MAGIC);
     assert(ftr->magic == VMEM_HEAP_MAGIC);
+    assert(hdr->hole == 0 && "Double free");
 
     hdr->hole = 1;
     bool add_hole = true;

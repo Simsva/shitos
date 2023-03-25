@@ -5,7 +5,7 @@
 
 typedef void * ord_arr_type_t;
 
-typedef struct {
+typedef struct ord_arr {
     ord_arr_type_t *array;
     size_t size, max_size;
     int (*compar)(ord_arr_type_t, ord_arr_type_t);

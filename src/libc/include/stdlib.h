@@ -16,6 +16,8 @@ _BEGIN_C_HEADER
 
 typedef __typeof__(sizeof 0) size_t;
 
+void *malloc(size_t);
+
 typedef struct { int quot, rem; }       div_t;
 typedef struct { long quot, rem; }      ldiv_t;
 typedef struct { long long quot, rem; } lldiv_t;
