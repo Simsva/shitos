@@ -25,19 +25,16 @@ void kmain(struct kernel_args *args) {
 
     tree_t *tree = tree_create();
 
-    tree_set_root(tree, (tree_item_t)1);
-    tree_node_t *node1 = tree_insert_item(tree, tree->root, (tree_item_t)2);
-    tree_node_t *node2 = tree_insert_item(tree, tree->root, (tree_item_t)3);
-    tree_insert_item(tree, node1, (tree_item_t)4);
-    tree_insert_item(tree, node2, (tree_item_t)5);
+    tree_set_root(tree, (tree_item_t)"[root]");
+    tree_node_t *node1 = tree_insert_item(tree, tree->root, (tree_item_t)"usr");
+    tree_node_t *node2 = tree_insert_item(tree, tree->root, (tree_item_t)"home");
+    tree_insert_item(tree, node1, (tree_item_t)"bin");
+    tree_insert_item(tree, node2, (tree_item_t)"emma");
 
-    printf("tree heap:\n");
-    vmem_heap_dump(&kheap);
+    printf("tree:\n");
+    tree_debug_dump_str(tree);
 
     tree_free(tree);
-
-    printf("tree heap post-free:\n");
-    vmem_heap_dump(&kheap);
 
     for(;;) asm("hlt");
 }

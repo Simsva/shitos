@@ -20,6 +20,8 @@ typedef struct list {
     size_t sz;
 } list_t;
 
+typedef int (*list_compar_t)(list_item_t, list_item_t);
+
 list_t *list_create(void);
 void list_destroy(list_t *list);
 void list_free(list_t *list);
@@ -45,8 +47,14 @@ list_node_t *list_get(list_t *list, size_t idx);
 list_t *list_copy(list_t *src);
 list_t *list_merge(list_t *dst, list_t *src);
 
-list_node_t *list_find(list_t *list, list_item_t item);
-ssize_t list_index_of(list_t *list, list_item_t item);
+list_node_t *list_find(list_t *list, list_item_t item, list_compar_t compar);
+list_node_t *list_find_eq(list_t *list, list_item_t item);
+ssize_t list_index_of(list_t *list, list_item_t item, list_compar_t compar);
+ssize_t list_index_of_eq(list_t *list, list_item_t item);
+
+void list_debug_dump(list_t *list, void (*print)(size_t, list_item_t));
+void list_debug_dump_ptr(list_t *list);
+void list_debug_dump_str(list_t *list);
 
 #define list_foreach(node, list)  for(list_node_t *node = (list)->head; node; node = node->next)
 #define list_foreachr(node, list) for(list_node_t *node = (list)->tail; node; node = node->prev)

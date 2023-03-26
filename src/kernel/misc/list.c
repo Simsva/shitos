@@ -2,7 +2,11 @@
 
 #include <features.h>
 #include <string.h>
+#include <stdio.h>
 #include <kernel/kmem.h>
+
+static void list_print_ptr(size_t i, list_item_t item);
+static void list_print_str(size_t i, list_item_t item);
 
 /* make a node out of an item */
 static inline list_node_t *list_nodeify(list_item_t item) {
@@ -18,6 +22,11 @@ static inline list_node_t *list_insert_first(list_t *list, list_node_t *node) {
     node->next = node->prev = NULL;
     list->sz++;
     return node;
+}
+
+/* normal list_compar_t function */
+static int list_compar_normal(list_item_t a, list_item_t b) {
+    return (intptr_t)a - (intptr_t)b;
 }
 
 /* create a new list */
@@ -205,17 +214,57 @@ list_t *list_merge(list_t *dst, list_t *src) {
     return dst;
 }
 
-list_node_t *list_find(list_t *list, list_item_t item) {
+/* return the node containing the specified item */
+list_node_t *list_find(list_t *list, list_item_t item, list_compar_t compar) {
     list_foreach(node, list)
-        if(node->value == item)
+        if(!compar(node->value, item))
             return node;
     return NULL;
 }
 
-ssize_t list_index_of(list_t *list, list_item_t item) {
+/* list_from with the default comparison function */
+list_node_t *list_find_eq(list_t *list, list_item_t item) {
+    return list_find(list, item, list_compar_normal);
+}
+
+/* get the index of the specified item */
+ssize_t list_index_of(list_t *list, list_item_t item, list_compar_t compar) {
     ssize_t i = 0;
     list_foreach(node, list)
-        if(node->value == item) return i;
+        if(!compar(node->value, item)) return i;
         else i++;
     return -1;
+}
+
+/* list_index_of with the default comparison function */
+ssize_t list_index_of_eq(list_t *list, list_item_t item) {
+    return list_index_of(list, item, list_compar_normal);
+}
+
+/* list_debug_dump callback to print pointers */
+static void list_print_ptr(size_t i, list_item_t item) {
+    printf("item %zu: %p\n", i, item);
+}
+
+/* list_debug_dump callback to print strings */
+static void list_print_str(size_t i, list_item_t item) {
+    printf("item %zu: %s\n", i, (char *)item);
+}
+
+/* print the contents of a list */
+void list_debug_dump(list_t *list, void (*print)(size_t, list_item_t)) {
+    if(!list || !print) return;
+    size_t i = 0;
+    list_foreach(node, list)
+        print(i++, node->value);
+}
+
+/* list_debug_dump printing as pointers */
+void list_debug_dump_ptr(list_t *list) {
+    list_debug_dump(list, list_print_ptr);
+}
+
+/* list_debug_dump printing as strings */
+void list_debug_dump_str(list_t *list) {
+    list_debug_dump(list, list_print_str);
 }

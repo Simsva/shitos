@@ -2,7 +2,17 @@
 
 #include <assert.h>
 #include <string.h>
+#include <stdio.h>
 #include <kernel/kmem.h>
+
+static void tree_debug_dump_recur(tree_node_t *node, void (*print)(tree_item_t), size_t depth);
+static void tree_print_ptr(tree_item_t item);
+static void tree_print_str(tree_item_t item);
+
+/* normal tree_compar_t function */
+static int tree_compar_normal(tree_item_t a, tree_item_t b) {
+    return (intptr_t)a - (intptr_t)b;
+}
 
 /* create a new tree */
 tree_t *tree_create(void) {
@@ -52,7 +62,7 @@ tree_node_t *tree_remove(tree_t *tree, tree_node_t *node) {
     if(!parent) return NULL;
 
     tree->sz--;
-    list_delete(parent->children, list_find(parent->children, node));
+    list_delete(parent->children, list_find_eq(parent->children, node));
     /* reassign parents */
     list_foreach(child, node->children)
         ((tree_node_t *)child->value)->parent = parent;
@@ -79,13 +89,18 @@ void tree_remove_branch(tree_t *tree, tree_node_t *node) {
 /* removes a branch from tree given the root node and its parent */
 void tree_remove_parent(tree_t *tree, tree_node_t *parent, tree_node_t *node) {
     tree->sz -= tree_node_count_children(node) + 1;
-    list_delete(parent->children, list_find(parent->children, node));
+    list_delete(parent->children, list_find_eq(parent->children, node));
     tree_node_free(node);
 }
 
 /* find node containing item in tree */
 tree_node_t *tree_find(tree_t *tree, tree_item_t item, tree_compar_t compar) {
     return tree_node_find(tree->root, item, compar);
+}
+
+/* tree_find with the default comparison function */
+tree_node_t *tree_find_eq(tree_t *tree, tree_item_t item) {
+    return tree_find(tree, item, tree_compar_normal);
 }
 
 /* create a new tree node containing item */
@@ -125,6 +140,11 @@ tree_node_t *tree_node_find(tree_node_t *node, tree_item_t item, tree_compar_t c
     return NULL;
 }
 
+/* tree_node_find with the default comparison function */
+tree_node_t *tree_node_find_eq(tree_node_t *node, tree_item_t item) {
+    return tree_node_find(node, item, tree_compar_normal);
+}
+
 /* return the number of (recursive) children this node has */
 size_t tree_node_count_children(tree_node_t *node) {
     if(!node || !node->children) return 0;
@@ -132,4 +152,38 @@ size_t tree_node_count_children(tree_node_t *node) {
     list_foreach(child, node->children)
         out += tree_node_count_children((tree_node_t *)child->value);
     return out;
+}
+
+static void tree_debug_dump_recur(tree_node_t *node, void (*print)(tree_item_t), size_t depth) {
+    for(size_t i = 0; i < depth; i++) putchar(' ');
+    print(node->value);
+
+    list_foreach(child, node->children)
+        tree_debug_dump_recur((tree_node_t *)child->value, print, depth + 1);
+}
+
+/* tree_debug_dump callback to print pointers */
+static void tree_print_ptr(tree_item_t item) {
+    printf("%p\n", item);
+}
+
+/* tree_debug_dump callback to print strings */
+static void tree_print_str(tree_item_t item) {
+    printf("%s\n", (char *)item);
+}
+
+/* print the contents of a tree */
+void tree_debug_dump(tree_t *tree, void (*print)(tree_item_t)) {
+    if(!tree || !print) return;
+    tree_debug_dump_recur(tree->root, print, 0);
+}
+
+/* tree_debug_dump printing as pointers */
+void tree_debug_dump_ptr(tree_t *tree) {
+    tree_debug_dump(tree, tree_print_ptr);
+}
+
+/* tree_debug_dump printing as strings */
+void tree_debug_dump_str(tree_t *tree) {
+    tree_debug_dump(tree, tree_print_str);
 }
