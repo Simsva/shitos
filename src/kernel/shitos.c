@@ -6,6 +6,7 @@
 
 #include <kernel/fs.h>
 #include <kernel/list.h>
+#include <kernel/tree.h>
 #include <kernel/vmem.h>
 
 #define STR(s) #s
@@ -22,24 +23,21 @@ void kmain(struct kernel_args *args) {
     buf[fs_read(fs_root, 0, SIZE_MAX, (uint8_t *)buf)] = '\0';
     printf("test_read: \"%s\"\n", buf);
 
-    int i;
-    list_t *list = list_create(), *list2;
-    for(i = 0; i < 10; i++)
-        list_push_item(list, (list_item_t)i);
+    tree_t *tree = tree_create();
 
-    i = 0;
-    list_foreach(node, list)
-        printf("item %d: %d\n", i++, (intptr_t)node->value);
+    tree_set_root(tree, (tree_item_t)1);
+    tree_node_t *node1 = tree_insert_item(tree, tree->root, (tree_item_t)2);
+    tree_node_t *node2 = tree_insert_item(tree, tree->root, (tree_item_t)3);
+    tree_insert_item(tree, node1, (tree_item_t)4);
+    tree_insert_item(tree, node2, (tree_item_t)5);
 
-    list2 = list_copy(list);
-    list_insert_item(list2, 2, (list_item_t)42);
+    printf("tree heap:\n");
+    vmem_heap_dump(&kheap);
 
-    i = list2->sz - 1;
-    list_foreachr(node, list2)
-        printf("item2 %d: %d\n", i--, (intptr_t)node->value);
+    tree_free(tree);
 
-    list_free(list);
-    list_free(list2);
+    printf("tree heap post-free:\n");
+    vmem_heap_dump(&kheap);
 
     for(;;) asm("hlt");
 }

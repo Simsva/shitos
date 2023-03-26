@@ -1,8 +1,10 @@
 #include <kernel/list.h>
 
+#include <features.h>
 #include <string.h>
 #include <kernel/kmem.h>
 
+/* make a node out of an item */
 static inline list_node_t *list_nodeify(list_item_t item) {
     list_node_t *node = kmalloc(sizeof(list_node_t));
     memset(node, 0, sizeof(list_node_t));
@@ -10,6 +12,7 @@ static inline list_node_t *list_nodeify(list_item_t item) {
     return node;
 }
 
+/* insert a node into an empty list */
 static inline list_node_t *list_insert_first(list_t *list, list_node_t *node) {
     list->head = list->tail = node;
     node->next = node->prev = NULL;
@@ -18,7 +21,7 @@ static inline list_node_t *list_insert_first(list_t *list, list_node_t *node) {
 }
 
 /* create a new list */
-list_t *list_create() {
+list_t *list_create(void) {
     list_t *out = kmalloc(sizeof(list_t));
     return memset(out, 0, sizeof(list_t));
 }
@@ -47,11 +50,13 @@ void list_free(list_t *list) {
 list_node_t *list_push(list_t *list, list_node_t *node) {
     return list_insert_before(list, NULL, node);
 }
+weak_alias(list_push, list_enqueue);
 
 /* append item at the end of list */
 list_node_t *list_push_item(list_t *list, list_item_t item) {
     return list_push(list, list_nodeify(item));
 }
+weak_alias(list_push_item, list_enqueue_item);
 
 /* insert node into list at index idx */
 list_node_t *list_insert(list_t *list, size_t idx, list_node_t *node) {
@@ -127,11 +132,6 @@ list_node_t *list_insert_item_before(list_t *list, list_node_t *after, list_item
     return list_insert_before(list, after, list_nodeify(item));
 }
 
-/* delete node at index idx from list */
-list_node_t *list_remove(list_t *list, size_t idx) {
-    return list_delete(list, list_get(list, idx));
-}
-
 /* delete node from list */
 list_node_t *list_delete(list_t *list, list_node_t *node) {
     if(node == list->head)
@@ -146,6 +146,11 @@ list_node_t *list_delete(list_t *list, list_node_t *node) {
     node->owner = NULL;
     list->sz--;
     return node;
+}
+
+/* delete node at index idx from list */
+list_node_t *list_delete_idx(list_t *list, size_t idx) {
+    return list_delete(list, list_get(list, idx));
 }
 
 /* deletes and returns the last node in the list
@@ -198,4 +203,19 @@ list_t *list_merge(list_t *dst, list_t *src) {
     dst->sz += src->sz;
     kfree(src);
     return dst;
+}
+
+list_node_t *list_find(list_t *list, list_item_t item) {
+    list_foreach(node, list)
+        if(node->value == item)
+            return node;
+    return NULL;
+}
+
+ssize_t list_index_of(list_t *list, list_item_t item) {
+    ssize_t i = 0;
+    list_foreach(node, list)
+        if(node->value == item) return i;
+        else i++;
+    return -1;
 }
