@@ -22,23 +22,25 @@ void kmain(struct kernel_args *args) {
     tm_cur_x = args->tm_cursor % 80;
     tm_cur_y = args->tm_cursor / 80;
 
-    puts("Booting ShitOS (" EXPAND_STR(_ARCH) ")");
-
     vfs_install();
     vfs_map_directory("/dev");
+    zero_install();
     random_install();
+    console_install();
+
+    puts("Booting ShitOS (" EXPAND_STR(_ARCH) ")");
 
     printf("fs_tree:\n");
     tree_debug_dump(fs_tree, tree_print_fs);
 
-    fs_node_t *random = kopen("/dev/random", 0);
-    uint8_t buf[8];
-    fs_read(random, 0, sizeof buf, buf);
+    fs_node_t *random = kopen("/dev/console", 0);
+    uint8_t buf[] = "this is a sea urchin";
+    fs_write(random, 0, sizeof buf, buf);
 
-    printf("random bytes: ");
-    for(size_t i = 0; i < sizeof buf; i++)
-        printf("%02X", buf[i]);
-    putchar('\n');
+    /* printf("random bytes: "); */
+    /* for(size_t i = 0; i < sizeof buf; i++) */
+    /*     printf("%02X", buf[i]); */
+    /* putchar('\n'); */
 
     fs_close(random);
     kfree(random);

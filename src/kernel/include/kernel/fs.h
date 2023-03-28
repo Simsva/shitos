@@ -69,6 +69,7 @@ struct vfs_entry {
 };
 
 extern tree_t *fs_tree;
+extern fs_node_t *console_dev; /* TODO: move this */
 
 ssize_t fs_read(fs_node_t *node, off_t off, size_t sz, uint8_t *buf);
 ssize_t fs_write(fs_node_t *node, off_t off, size_t sz, uint8_t *buf);
@@ -80,6 +81,8 @@ int fs_readlink(fs_node_t *node, char *buf, size_t sz);
 
 void vfs_install(void);
 void random_install(void);
+void zero_install(void);
+void console_install(void);
 
 void *vfs_mount(const char *path, fs_node_t *root);
 void vfs_map_directory(const char *path);
