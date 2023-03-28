@@ -6,6 +6,8 @@
 #include <sys/types.h>
 #include <dirent.h>
 
+#include <kernel/tree.h>
+
 /* fs_node::flags */
 /* first three bits are reserved for the filetype */
 #define FS_FLAG_TYPE_MASK 07
@@ -18,6 +20,11 @@
 
 #define FS_FLAG_MOUNT     0x08    /* is mountpoint? */
 
+#define PATH_SEPARATOR     '/'
+#define PATH_SEPARATOR_STR "/"
+#define PATH_CURRENT       "."
+#define PATH_GO_UP         ".."
+
 struct fs_node;
 
 typedef ssize_t (*read_type_t)(struct fs_node *, off_t, size_t, uint8_t *);
@@ -26,8 +33,9 @@ typedef void (*open_type_t)(struct fs_node *, unsigned);
 typedef void (*close_type_t)(struct fs_node *);
 typedef struct dirent *(*readdir_type_t)(struct fs_node *, off_t);
 typedef struct fs_node *(*finddir_type_t)(struct fs_node *, char *);
+typedef ssize_t (*readlink_type_t)(struct fs_node *, char *, size_t);
 
-struct fs_node {
+typedef struct fs_node {
     char name[256];        /* filename */
     void *device;          /* device */
     mode_t mask;           /* permissions mask */
@@ -46,23 +54,37 @@ struct fs_node {
     close_type_t close;
     readdir_type_t readdir;
     finddir_type_t finddir;
+    readlink_type_t readlink;
 
     struct fs_node *ptr;   /* alias pointer, for symlinks */
     intmax_t refcount;
+} fs_node_t;
+
+struct vfs_entry {
+    char *name;            /* name of entry */
+    struct fs_node *file;  /* fs_node it points to */
+    char *args;            /* mount arguments (including device file
+                            * for physical filesystems) */
+    char *fs_type;         /* filesystem type */
 };
 
-extern struct fs_node *fs_root;
+extern tree_t *fs_tree;
 
-ssize_t fs_read(struct fs_node *node, off_t off, size_t sz, uint8_t *buf);
-ssize_t fs_write(struct fs_node *node, off_t off, size_t sz, uint8_t *buf);
-void fs_open(struct fs_node *node, unsigned flags);
-void fs_close(struct fs_node *node);
-struct dirent *fs_readdir(struct fs_node *node, off_t idx);
-struct fs_node *fs_finddir(struct fs_node *node, char *name);
+ssize_t fs_read(fs_node_t *node, off_t off, size_t sz, uint8_t *buf);
+ssize_t fs_write(fs_node_t *node, off_t off, size_t sz, uint8_t *buf);
+void fs_open(fs_node_t *node, unsigned flags);
+void fs_close(fs_node_t *node);
+struct dirent *fs_readdir(fs_node_t *node, off_t idx);
+fs_node_t *fs_finddir(fs_node_t *node, char *name);
+int fs_readlink(fs_node_t *node, char *buf, size_t sz);
 
-struct fs_node *kopen(const char *path, unsigned flags);
+void vfs_install(void);
+void random_install(void);
 
-/* TODO: remove this */
-void fs_init_test(void);
+void *vfs_mount(const char *path, fs_node_t *root);
+void vfs_map_directory(const char *path);
+
+char *canonicalize_path(const char *cwd, const char *path, size_t *length);
+fs_node_t *kopen(const char *path, unsigned flags);
 
 #endif // KERNEL_FS_H_

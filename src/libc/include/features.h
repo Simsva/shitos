@@ -21,4 +21,10 @@
 #define weak_alias(old, new) \
     extern __typeof(old) new __attribute__((__weak__, __alias__(#old)))
 
+#ifdef __GNUC__
+#define __unused __attribute__((unused))
+#else
+#define __unused
+#endif
+
 #endif // FEATURES_H_

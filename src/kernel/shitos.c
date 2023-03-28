@@ -5,12 +5,18 @@
 #include <stdio.h>
 
 #include <kernel/fs.h>
-#include <kernel/list.h>
-#include <kernel/tree.h>
-#include <kernel/vmem.h>
+#include <kernel/kmem.h>
 
 #define STR(s) #s
 #define EXPAND_STR(s) STR(s)
+
+static void tree_print_fs(tree_item_t item) {
+    struct vfs_entry *entry = item;
+    if(entry->file)
+        printf("%s -> %p : %u\n", entry->name, entry->file->device, entry->file->inode);
+    else
+        printf("%s\n", entry->name);
+}
 
 void kmain(struct kernel_args *args) {
     tm_cur_x = args->tm_cursor % 80;
@@ -18,23 +24,24 @@ void kmain(struct kernel_args *args) {
 
     puts("Booting ShitOS (" EXPAND_STR(_ARCH) ")");
 
-    char buf[256];
-    fs_init_test();
-    buf[fs_read(fs_root, 0, SIZE_MAX, (uint8_t *)buf)] = '\0';
-    printf("test_read: \"%s\"\n", buf);
+    vfs_install();
+    vfs_map_directory("/dev");
+    random_install();
 
-    tree_t *tree = tree_create();
+    printf("fs_tree:\n");
+    tree_debug_dump(fs_tree, tree_print_fs);
 
-    tree_set_root(tree, (tree_item_t)"[root]");
-    tree_node_t *node1 = tree_insert_item(tree, tree->root, (tree_item_t)"usr");
-    tree_node_t *node2 = tree_insert_item(tree, tree->root, (tree_item_t)"home");
-    tree_insert_item(tree, node1, (tree_item_t)"bin");
-    tree_insert_item(tree, node2, (tree_item_t)"emma");
+    fs_node_t *random = kopen("/dev/random", 0);
+    uint8_t buf[8];
+    fs_read(random, 0, sizeof buf, buf);
 
-    printf("tree:\n");
-    tree_debug_dump_str(tree);
+    printf("random bytes: ");
+    for(size_t i = 0; i < sizeof buf; i++)
+        printf("%02X", buf[i]);
+    putchar('\n');
 
-    tree_free(tree);
+    fs_close(random);
+    kfree(random);
 
     for(;;) asm("hlt");
 }

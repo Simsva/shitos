@@ -115,7 +115,7 @@ static void vmem_heap_expand(vmem_heap_t *heap, size_t new_sz) {
 }
 
 /* unused as of now */
-static size_t __attribute__((unused)) vmem_heap_contract(vmem_heap_t *heap, size_t new_sz) {
+static size_t __unused vmem_heap_contract(vmem_heap_t *heap, size_t new_sz) {
     new_sz = (new_sz + PAGE_SIZE-1) & ~(PAGE_SIZE-1);
     if(new_sz < VMEM_HEAP_INITIAL_SZ) new_sz = VMEM_HEAP_INITIAL_SZ;
     assert(new_sz < (size_t)(heap->end - heap->start));

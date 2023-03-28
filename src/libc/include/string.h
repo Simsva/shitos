@@ -14,9 +14,18 @@ void *memset(void *, int, size_t);
 int memcmp(const void *, const void *, size_t);
 void *memchr(const void *, int, size_t);
 
+char *strcpy(char *__restrict, const char *__restrict);
 int strcmp(const char *, const char *);
-
+char *strdup(const char *);
+size_t strlen(const char *);
 size_t strnlen(const char *, size_t);
+
+size_t strcspn(const char *, const char *);
+size_t strspn(const char *, const char *);
+char *strtok(char *__restrict, const char *__restrict);
+char *strtok_r(char *__restrict, const char *__restrict, char **__restrict);
+
+char *strchrnul(const char *, int);
 
 _END_C_HEADER
 
