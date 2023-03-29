@@ -5,8 +5,7 @@
 #include <stdio.h>
 
 #include <kernel/fs.h>
-#include <kernel/kmem.h>
-#include <kernel/pipe.h>
+#include <kernel/pci.h>
 
 #define STR(s) #s
 #define EXPAND_STR(s) STR(s)
@@ -20,6 +19,12 @@ static void tree_print_fs(tree_item_t item) {
         printf("%s -> %p : %u\n", entry->name, entry->file->device, entry->file->inode);
     else
         printf("%s\n", entry->name);
+}
+
+/* detect some Intel IDE controller device */
+static void find_ata_pci(pci_device_t dev, uint16_t vnid, uint16_t dvid, void *extra) {
+    if(vnid == 0x8086 && (dvid == 0x7010 || dvid == 0x7111))
+        *(pci_device_t *)extra = dev;
 }
 
 void kmain(struct kernel_args *args) {
@@ -38,18 +43,10 @@ void kmain(struct kernel_args *args) {
     printf("fs_tree:\n");
     tree_debug_dump(fs_tree, tree_print_fs);
 
-    fs_node_t *kbd_pipe = kopen("/dev/kbd", 0);
-    uint8_t buf;
-    for(;;) {
-        if(pipe_size(kbd_pipe)) {
-            fs_read(kbd_pipe, 0, 1, &buf);
-            printf("%02X ", buf);
-        }
-    }
+    pci_device_t ata_dev = (pci_device_t){ .raw = 0 };
+    pci_scan(find_ata_pci, -1, &ata_dev);
 
-    /* unreachable */
-    fs_close(kbd_pipe);
-    kfree(kbd_pipe);
+    printf("IDE: bus:%u slot:%u func:%u\n", ata_dev.bus, ata_dev.slot, ata_dev.func);
 
     for(;;) asm("hlt");
 }
