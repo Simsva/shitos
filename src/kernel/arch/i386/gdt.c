@@ -1,4 +1,4 @@
-#include "gdt.h"
+#include <kernel/arch/i386/gdt.h>
 
 extern void _gdt_flush();
 

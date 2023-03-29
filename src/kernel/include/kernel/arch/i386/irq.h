@@ -3,7 +3,7 @@
 
 #include <stdint.h>
 
-#include "idt.h"
+#include <kernel/arch/i386/idt.h>
 
 typedef void (*irq_handler_t)(struct int_regs *);
 

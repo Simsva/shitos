@@ -6,9 +6,13 @@
 
 #include <kernel/fs.h>
 #include <kernel/kmem.h>
+#include <kernel/pipe.h>
 
 #define STR(s) #s
 #define EXPAND_STR(s) STR(s)
+
+/* TODO: move */
+void ps2hid_install(void);
 
 static void tree_print_fs(tree_item_t item) {
     struct vfs_entry *entry = item;
@@ -27,23 +31,25 @@ void kmain(struct kernel_args *args) {
     zero_install();
     random_install();
     console_install();
+    ps2hid_install();
 
     puts("Booting ShitOS (" EXPAND_STR(_ARCH) ")");
 
     printf("fs_tree:\n");
     tree_debug_dump(fs_tree, tree_print_fs);
 
-    fs_node_t *random = kopen("/dev/console", 0);
-    uint8_t buf[] = "this is a sea urchin";
-    fs_write(random, 0, sizeof buf, buf);
+    fs_node_t *kbd_pipe = kopen("/dev/kbd", 0);
+    uint8_t buf;
+    for(;;) {
+        if(pipe_size(kbd_pipe)) {
+            fs_read(kbd_pipe, 0, 1, &buf);
+            printf("%02X ", buf);
+        }
+    }
 
-    /* printf("random bytes: "); */
-    /* for(size_t i = 0; i < sizeof buf; i++) */
-    /*     printf("%02X", buf[i]); */
-    /* putchar('\n'); */
-
-    fs_close(random);
-    kfree(random);
+    /* unreachable */
+    fs_close(kbd_pipe);
+    kfree(kbd_pipe);
 
     for(;;) asm("hlt");
 }

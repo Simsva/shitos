@@ -7,7 +7,7 @@
 #include <stdio.h>
 #include <ansi.h>
 
-#include "idt.h"
+#include <kernel/arch/i386/idt.h>
 
 /* globals */
 extern void *kernel_pd;

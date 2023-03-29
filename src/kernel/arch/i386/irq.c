@@ -1,4 +1,4 @@
-#include "irq.h"
+#include <kernel/arch/i386/irq.h>
 
 #include <sys/utils.h>
 #include <stddef.h>
