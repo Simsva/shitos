@@ -56,31 +56,34 @@ void list_free(list_t *list) {
 }
 
 /* append node at the end of list */
-list_node_t *list_push(list_t *list, list_node_t *node) {
-    return list_insert_before(list, NULL, node);
+list_node_t *list_push_node(list_t *list, list_node_t *node) {
+    return list_insert_node_before(list, NULL, node);
 }
-weak_alias(list_push, list_enqueue);
+weak_alias(list_push_node, list_enqueue_node);
 
 /* append item at the end of list */
 list_node_t *list_push_item(list_t *list, list_item_t item) {
-    return list_push(list, list_nodeify(item));
+    return list_push_node(list, list_nodeify(item));
 }
 weak_alias(list_push_item, list_enqueue_item);
+weak_alias(list_push_item, list_push);
+weak_alias(list_push_item, list_enqueue);
 
 /* insert node into list at index idx */
-list_node_t *list_insert(list_t *list, size_t idx, list_node_t *node) {
+list_node_t *list_insert_node(list_t *list, size_t idx, list_node_t *node) {
     list_node_t *after = list_get(list, idx);
-    if(node) return list_insert_before(list, after, node);
+    if(node) return list_insert_node_before(list, after, node);
     return NULL;
 }
 
 /* insert item into list at index idx */
 list_node_t *list_insert_item(list_t *list, size_t idx, list_item_t item) {
-    return list_insert(list, idx, list_nodeify(item));
+    return list_insert_node(list, idx, list_nodeify(item));
 }
+weak_alias(list_insert_item, list_insert);
 
 /* insert node into list after the specified node */
-list_node_t *list_insert_after(list_t *list, list_node_t *before, list_node_t *node) {
+list_node_t *list_insert_node_after(list_t *list, list_node_t *before, list_node_t *node) {
     node->owner = list;
     if(!list->sz) return list_insert_first(list, node);
     if(before == NULL) {
@@ -107,11 +110,12 @@ list_node_t *list_insert_after(list_t *list, list_node_t *before, list_node_t *n
 
 /* insert item into list after the specified node */
 list_node_t *list_insert_item_after(list_t *list, list_node_t *before, list_item_t item) {
-    return list_insert_after(list, before, list_nodeify(item));
+    return list_insert_node_after(list, before, list_nodeify(item));
 }
+weak_alias(list_insert_item_after, list_insert_after);
 
 /* insert node into list before the specified node */
-list_node_t *list_insert_before(list_t *list, list_node_t *after, list_node_t *node) {
+list_node_t *list_insert_node_before(list_t *list, list_node_t *after, list_node_t *node) {
     node->owner = list;
     if(!list->sz) return list_insert_first(list, node);
     if(after == NULL) {
@@ -138,11 +142,12 @@ list_node_t *list_insert_before(list_t *list, list_node_t *after, list_node_t *n
 
 /* insert item into list before the specified node */
 list_node_t *list_insert_item_before(list_t *list, list_node_t *after, list_item_t item) {
-    return list_insert_before(list, after, list_nodeify(item));
+    return list_insert_node_before(list, after, list_nodeify(item));
 }
+weak_alias(list_insert_item_before, list_insert_before);
 
 /* delete node from list */
-list_node_t *list_delete(list_t *list, list_node_t *node) {
+list_node_t *list_delete_node(list_t *list, list_node_t *node) {
     if(node == list->head)
         list->head = node->next;
     if(node == list->tail)
@@ -156,10 +161,11 @@ list_node_t *list_delete(list_t *list, list_node_t *node) {
     list->sz--;
     return node;
 }
+weak_alias(list_delete_node, list_delete);
 
 /* delete node at index idx from list */
 list_node_t *list_delete_idx(list_t *list, size_t idx) {
-    return list_delete(list, list_get(list, idx));
+    return list_delete_node(list, list_get(list, idx));
 }
 
 /* deletes and returns the last node in the list
@@ -168,7 +174,7 @@ list_node_t *list_delete_idx(list_t *list, size_t idx) {
 list_node_t *list_pop(list_t *list) {
     if(!list->tail) return NULL;
     list_node_t *out = list->tail;
-    return list_delete(list, out);
+    return list_delete_node(list, out);
 }
 
 /* deletes and returns the first node in the list
@@ -177,7 +183,7 @@ list_node_t *list_pop(list_t *list) {
 list_node_t *list_dequeue(list_t *list) {
     if(!list->head) return NULL;
     list_node_t *out = list->head;
-    return list_delete(list, out);
+    return list_delete_node(list, out);
 }
 
 /* returns the node at index idx in list (or NULL) */

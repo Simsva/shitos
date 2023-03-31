@@ -1,11 +1,12 @@
 #include <kernel/tty/tm.h>
+#include <kernel/fs.h>
 #include <kernel/args.h>
 #include <stdio.h>
 #include <string.h>
 
 #include <kernel/arch/i386/ports.h>
 
-#include <kernel/fs.h>
+#include <kernel/hashmap.h>
 
 #define STR(s) #s
 #define EXPAND_STR(s) STR(s)
@@ -32,19 +33,30 @@ void kmain(struct kernel_args *args) {
     vfs_install();
     vfs_map_directory("/dev");
     console_install();
-    zero_install();
-    random_install();
-    ps2hid_install();
-    ide_init();
+    /* zero_install(); */
+    /* random_install(); */
+    /* ps2hid_install(); */
+    /* ide_init(); */
 
     puts("Booting ShitOS (" EXPAND_STR(_ARCH) ")");
 
     printf("fs_tree:\n");
     tree_debug_dump(fs_tree, tree_print_fs);
 
-    char buf[16];
-    snprintf(buf, sizeof buf, "/dev/ada%d", 1);
-    printf("buf: %s\n", buf);
+    hashmap_t *map = hashmap_create_str(2);
+    map->value_free = NULL;
+    hashmap_set(map, "hello", (void *)13);
+    hashmap_set(map, "world", (void *)37);
+    hashmap_set(map, "foo", (void *)69);
+    hashmap_set(map, "bar", (void *)96);
+
+    hashmap_delete(map, "world");
+
+    printf("hello world foo bar : %d %d %d %d\n",
+           (int)hashmap_get(map, "hello"), (int)hashmap_get(map, "world"),
+           (int)hashmap_get(map, "foo"), (int)hashmap_get(map, "bar"));
+
+    hashmap_free(map);
 
     for(;;) asm volatile("hlt");
 }

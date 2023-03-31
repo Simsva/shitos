@@ -41,7 +41,7 @@ void tree_set_root(tree_t *tree, tree_item_t item) {
 }
 
 /* insert node as a child of parent (returns node) */
-tree_node_t *tree_insert(tree_t *tree, tree_node_t *parent, tree_node_t *node) {
+tree_node_t *tree_insert_node(tree_t *tree, tree_node_t *parent, tree_node_t *node) {
     list_push_item(parent->children, node);
     node->parent = parent;
     tree->sz++;
@@ -50,8 +50,9 @@ tree_node_t *tree_insert(tree_t *tree, tree_node_t *parent, tree_node_t *node) {
 
 /* insert item as a child of parent (returns the created node) */
 tree_node_t *tree_insert_item(tree_t *tree, tree_node_t *parent, tree_item_t item) {
-    return tree_insert(tree, parent, tree_node_create(item));
+    return tree_insert_node(tree, parent, tree_node_create(item));
 }
+weak_alias(tree_insert_item, tree_insert);
 
 /* remove node and move its children into its parent's list of children
  * returns new parent */

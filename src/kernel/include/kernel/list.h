@@ -26,18 +26,24 @@ list_t *list_create(void);
 void list_destroy(list_t *list);
 void list_free(list_t *list);
 
-list_node_t *list_push(list_t *list, list_node_t *node);
+list_node_t *list_push_node(list_t *list, list_node_t *node);
 list_node_t *list_push_item(list_t *list, list_item_t item);
-list_node_t *list_enqueue(list_t *list, list_node_t *node);
+list_node_t *list_push(list_t *list, list_item_t item);
+list_node_t *list_enqueue_node(list_t *list, list_node_t *node);
 list_node_t *list_enqueue_item(list_t *list, list_item_t item);
-list_node_t *list_insert(list_t *list, size_t idx, list_node_t *node);
+list_node_t *list_enqueue(list_t *list, list_item_t item);
+list_node_t *list_insert_node(list_t *list, size_t idx, list_node_t *node);
 list_node_t *list_insert_item(list_t *list, size_t idx, list_item_t item);
+list_node_t *list_insert(list_t *list, size_t idx, list_item_t item);
 
-list_node_t *list_insert_after(list_t *list, list_node_t *before, list_node_t *node);
+list_node_t *list_insert_node_after(list_t *list, list_node_t *before, list_node_t *node);
 list_node_t *list_insert_item_after(list_t *list, list_node_t *before, list_item_t item);
-list_node_t *list_insert_before(list_t *list, list_node_t *after, list_node_t *node);
+list_node_t *list_insert_after(list_t *list, list_node_t *before, list_item_t item);
+list_node_t *list_insert_node_before(list_t *list, list_node_t *after, list_node_t *node);
 list_node_t *list_insert_item_before(list_t *list, list_node_t *after, list_item_t item);
+list_node_t *list_insert_before(list_t *list, list_node_t *after, list_item_t item);
 
+list_node_t *list_delete_node(list_t *list, list_node_t *node);
 list_node_t *list_delete(list_t *list, list_node_t *node);
 list_node_t *list_delete_idx(list_t *list, size_t idx);
 list_node_t *list_pop(list_t *list);

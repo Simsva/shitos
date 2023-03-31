@@ -26,8 +26,9 @@ void tree_destroy(tree_t *tree);
 void tree_free(tree_t *tree);
 
 void tree_set_root(tree_t *tree, tree_item_t item);
-tree_node_t *tree_insert(tree_t *tree, tree_node_t *parent, tree_node_t *node);
+tree_node_t *tree_insert_node(tree_t *tree, tree_node_t *parent, tree_node_t *node);
 tree_node_t *tree_insert_item(tree_t *tree, tree_node_t *parent, tree_item_t item);
+tree_node_t *tree_insert(tree_t *tree, tree_node_t *parent, tree_item_t item);
 
 tree_node_t *tree_remove(tree_t *tree, tree_node_t *node);
 void tree_remove_branch(tree_t *tree, tree_node_t *node);
