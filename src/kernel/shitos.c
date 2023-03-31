@@ -33,10 +33,10 @@ void kmain(struct kernel_args *args) {
     vfs_install();
     vfs_map_directory("/dev");
     console_install();
-    /* zero_install(); */
-    /* random_install(); */
-    /* ps2hid_install(); */
-    /* ide_init(); */
+    zero_install();
+    random_install();
+    ps2hid_install();
+    ide_init();
 
     puts("Booting ShitOS (" EXPAND_STR(_ARCH) ")");
 
