@@ -46,6 +46,9 @@ void kmain(struct kernel_args *args) {
     uint16_t magic;
     fs_read(ada, 0x1fe, 2, (uint8_t *)&magic);
     printf("/dev/ada MBR magic: %04X\n", magic);
+    /* Will make the ISO unbootable */
+    /* magic = 0x1337; */
+    /* fs_write(ada, 0x1fe, 2, (uint8_t *)&magic); */
 
     for(;;) asm volatile("hlt");
 }

@@ -156,21 +156,27 @@ static void ata_io_wait(ata_device_t *dev);
 static uint8_t ata_status_wait(ata_device_t *dev, int timeout);
 static void ata_soft_reset(ata_device_t *dev);
 static void ata_device_detect(ata_device_t *dev);
-static fs_node_t *ata_device_create(ata_device_t *dev);
+static fs_node_t *ata_device_create(ata_device_t *dev, char drive_char);
 static void find_ide_pci(pci_device_t dev, uint16_t vnid, uint16_t dvid, void *extra);
 
 static void ata_device_init(ata_device_t *dev);
+static void ata_device_destroy(ata_device_t *dev);
 static void ata_device_read_block(ata_device_t *dev, lba48_t lba, uint8_t *buf);
 static void ata_device_read_block_internal(ata_device_t *dev, lba48_t lba);
+static void ata_device_write_block(ata_device_t *dev, lba48_t lba, uint8_t *buf);
+static void ata_device_write_block_internal(ata_device_t *dev, lba48_t lba);
 static void ata_irq_handler(struct int_regs *r);
 
 static off_t ata_max_offset(ata_device_t *dev);
 static ssize_t ata_read(fs_node_t *node, off_t off, size_t sz, uint8_t *buf);
+static ssize_t ata_write(fs_node_t *node, off_t off, size_t sz, uint8_t *buf);
 
 void ide_init(void);
 
 #define DPRINTF(fmt, ...) if(kernel_args.boot_options & BOOT_OPT_VERBOSE) { \
         printf(fmt, __VA_ARGS__); }
+#define DPUTS(str) if(kernel_args.boot_options & BOOT_OPT_VERBOSE) { \
+        puts(str); }
 
 static void ata_io_wait(ata_device_t *dev) {
     inportb(dev->io_base + ATA_REG_ALTSTATUS);
@@ -224,14 +230,15 @@ static void ata_device_detect(ata_device_t *dev) {
 
         off_t sectors = ata_max_offset(dev);
         if(sectors == 0) {
-            puts("ide: max offset == 0");
+            DPUTS("ide: max offset == 0");
+            ata_device_destroy(dev);
             return;
         }
 
         /* TODO: sprintf */
         char devname[] = "/dev/adX";
-        devname[sizeof devname - 2] = ata_drive_char++;
-        fs_node_t *fnode = ata_device_create(dev);
+        devname[sizeof devname - 2] = ata_drive_char;
+        fs_node_t *fnode = ata_device_create(dev, ata_drive_char++);
         vfs_mount(devname, fnode);
         fnode->sz = sectors;
 
@@ -248,11 +255,12 @@ static void ata_device_detect(ata_device_t *dev) {
     return;
 }
 
-static fs_node_t *ata_device_create(ata_device_t *dev) {
+static fs_node_t *ata_device_create(ata_device_t *dev, char drive_char) {
     fs_node_t *fnode = kmalloc(sizeof(fs_node_t));
     memset(fnode, 0, sizeof(fs_node_t));
-    /* TODO: add drive_char */
-    strcpy(fnode->name, "atadev");
+    /* TODO: sprintf */
+    strcpy(fnode->name, "atadevX");
+    fnode->name[sizeof "atadevX" - 2] = drive_char;
     fnode->device = dev;
     fnode->uid = 0;
     fnode->gid = 0;
@@ -260,6 +268,7 @@ static fs_node_t *ata_device_create(ata_device_t *dev) {
     fnode->flags = FS_TYPE_BLOCK;
 
     fnode->read = ata_read;
+    fnode->write = ata_write;
 
     return fnode;
 }
@@ -317,6 +326,12 @@ static void ata_device_init(ata_device_t *dev) {
         dev->bar4 &= 0xfffffffc;
 }
 
+/* only called on unused devices */
+static void ata_device_destroy(ata_device_t *dev) {
+    kfree(dev->dma_prdt);
+    kfree(dev->dma_start);
+}
+
 /* TODO: caching */
 static void ata_device_read_block(ata_device_t *dev, lba48_t lba, uint8_t *buf) {
     /* we only read one block at a time, so lba is really
@@ -349,6 +364,7 @@ static void ata_device_read_block_internal(ata_device_t *dev, lba48_t lba) {
     /* select drive in LBA mode */
     outportb(dev->io_base + ATA_REG_HDDEVSEL, 0xe0 | dev->slave << 4);
     ata_io_wait(dev);
+    ata_status_wait(dev, -1);
     outportb(dev->io_base + ATA_REG_FEATURES, 0x00);
 
     /* select high 24 bits of LBA (NOTE: uses 32-bit ints) */
@@ -369,8 +385,8 @@ static void ata_device_read_block_internal(ata_device_t *dev, lba48_t lba) {
     /* DMA read extended (48-bit LBA) */
     outportb(dev->io_base + ATA_REG_COMMAND, ATA_CMD_READ_DMA_EXT);
     ata_io_wait(dev);
-    /* set start/stop bit */
-    outportb(dev->bar4, (1<<0));
+    /* set read and start/stop bit */
+    outportb(dev->bar4, (1<<3) | (1<<0));
 
     /* wait for read to finish */
     for(;;) {
@@ -383,6 +399,67 @@ static void ata_device_read_block_internal(ata_device_t *dev, lba48_t lba) {
         if(!(dstatus & ATA_STATUS_BSY))
             break;
     }
+
+    /* reset IRQ and error bit or something idk */
+    status = inportb(dev->bar4 + 2);
+    outportb(dev->bar4 + 2, status | (1<<2) | (1<<1));
+}
+
+static void ata_device_write_block(ata_device_t *dev, lba48_t lba, uint8_t *buf) {
+    /* we only read one block at a time, so lba is really
+     * the block address and not the ATA sector address */
+    lba.raw *= ATA_SECTORS_PER_BLOCK;
+
+    memcpy(dev->dma_start, buf, ATA_BLOCK_SZ);
+    ata_device_write_block_internal(dev, lba);
+}
+
+static void ata_device_write_block_internal(ata_device_t *dev, lba48_t lba) {
+    uint8_t status;
+    if(dev->is_atapi) return;
+
+    ata_io_wait(dev);
+    ata_status_wait(dev, -1);
+
+    /* clear command register (including read/write bit) */
+    outportb(dev->bar4, 0);
+    /* set the PRDT (BAR4 + 4 to 7 bytes) */
+    outportl(dev->bar4 + 4, dev->dma_prdt_phys);
+    /* clear error and IRQ bit */
+    status = inportb(dev->bar4 + 2);
+    outportb(dev->bar4 + 2, status | (1<<1) | (1<<3));
+
+    ata_status_wait(dev, -1);
+    outportb(dev->io_base + ATA_REG_CONTROL, 0x00);
+    /* select drive in LBA mode */
+    outportb(dev->io_base + ATA_REG_HDDEVSEL, 0xe0 | dev->slave << 4);
+    ata_io_wait(dev);
+    ata_status_wait(dev, -1);
+    outportb(dev->io_base + ATA_REG_FEATURES, 0x00);
+
+    /* select high 24 bits of LBA (NOTE: uses 32-bit ints) */
+    outportb(dev->io_base + ATA_REG_SECCOUNT0, 0);
+    outportb(dev->io_base + ATA_REG_LBA0, (lba.lo & 0xff000000) >> 24);
+    outportb(dev->io_base + ATA_REG_LBA1, (lba.hi & 0x000000ff));
+    outportb(dev->io_base + ATA_REG_LBA2, (lba.hi & 0x0000ff00) >> 8);
+    /* select low 24 bits of LBA */
+    outportb(dev->io_base + ATA_REG_SECCOUNT0, ATA_SECTORS_PER_BLOCK);
+    outportb(dev->io_base + ATA_REG_LBA0, (lba.lo & 0x000000ff) >> 0);
+    outportb(dev->io_base + ATA_REG_LBA1, (lba.lo & 0x0000ff00) >> 8);
+    outportb(dev->io_base + ATA_REG_LBA2, (lba.lo & 0x00ff0000) >> 16);
+
+    /* wait for drive to be ready */
+    do status = inportb(dev->io_base + ATA_REG_STATUS);
+    while((status & ATA_STATUS_BSY) || !(status & ATA_STATUS_DRDY));
+
+    /* DMA write extended (48-bit LBA) */
+    outportb(dev->io_base + ATA_REG_COMMAND, ATA_CMD_WRITE_DMA_EXT);
+    ata_io_wait(dev);
+    /* set start/stop bit */
+    outportb(dev->bar4, (1<<0));
+
+    ata_io_wait(dev);
+    ata_status_wait(dev, -1);
 
     /* reset IRQ and error bit or something idk */
     status = inportb(dev->bar4 + 2);
@@ -454,6 +531,59 @@ static ssize_t ata_read(fs_node_t *node, off_t off, size_t sz, uint8_t *buf) {
     /* read the remaining blocks */
     while(start_block.raw <= end_block.raw) {
         ata_device_read_block(dev, start_block, buf + buf_offset);
+        buf_offset += ATA_BLOCK_SZ;
+        start_block.raw++;
+    }
+
+    return sz;
+}
+
+static ssize_t ata_write(fs_node_t *node, off_t off, size_t sz, uint8_t *buf) {
+    ata_device_t *dev = node->device;
+    lba48_t start_block = (lba48_t){ .raw = off / ATA_BLOCK_SZ };
+    lba48_t end_block = (lba48_t){ .raw = (off + sz - 1) / ATA_BLOCK_SZ };
+    size_t buf_offset = 0;
+
+    off_t max_off = ata_max_offset(dev);
+    if(off > max_off) return 0;
+    if(off + (ssize_t)sz > max_off)
+        sz = max_off - off;
+
+    /* if start is not on a block boundary
+     * unlike when reading we don't need to worry
+     * about the size being lower than the block size */
+    if(off % ATA_BLOCK_SZ) {
+        size_t prefix_sz = ATA_BLOCK_SZ - (off % ATA_BLOCK_SZ);
+
+        uint8_t *tmp = kmalloc(ATA_BLOCK_SZ);
+        ata_device_read_block(dev, start_block, tmp);
+
+        memcpy(tmp + (off % ATA_BLOCK_SZ), buf, prefix_sz);
+        ata_device_write_block(dev, start_block, tmp);
+
+        kfree(tmp);
+        buf_offset += prefix_sz;
+        /* first block is written */
+        start_block.raw++;
+    }
+
+    /* if end is not on a block boundary */
+    if((off + sz) % ATA_BLOCK_SZ && start_block.raw <= end_block.raw) {
+        size_t postfix_sz = (off + sz) % ATA_BLOCK_SZ;
+        uint8_t *tmp = kmalloc(ATA_BLOCK_SZ);
+        ata_device_read_block(dev, end_block, tmp);
+
+        memcpy(tmp, buf + sz - postfix_sz, postfix_sz);
+        ata_device_write_block(dev, end_block, tmp);
+
+        kfree(tmp);
+        /* last block is written */
+        end_block.raw--;
+    }
+
+    /* write the remaining blocks */
+    while(start_block.raw <= end_block.raw) {
+        ata_device_write_block(dev, start_block, buf + buf_offset);
         buf_offset += ATA_BLOCK_SZ;
         start_block.raw++;
     }
