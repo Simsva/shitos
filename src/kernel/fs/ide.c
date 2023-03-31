@@ -235,9 +235,8 @@ static void ata_device_detect(ata_device_t *dev) {
             return;
         }
 
-        /* TODO: sprintf */
-        char devname[] = "/dev/adX";
-        devname[sizeof devname - 2] = ata_drive_char;
+        char devname[64];
+        snprintf(devname, sizeof devname, "/dev/ad%c", ata_drive_char);
         fs_node_t *fnode = ata_device_create(dev, ata_drive_char++);
         vfs_mount(devname, fnode);
         fnode->sz = sectors;
@@ -258,9 +257,7 @@ static void ata_device_detect(ata_device_t *dev) {
 static fs_node_t *ata_device_create(ata_device_t *dev, char drive_char) {
     fs_node_t *fnode = kmalloc(sizeof(fs_node_t));
     memset(fnode, 0, sizeof(fs_node_t));
-    /* TODO: sprintf */
-    strcpy(fnode->name, "atadevX");
-    fnode->name[sizeof "atadevX" - 2] = drive_char;
+    snprintf(fnode->name, sizeof fnode->name, "atadev%c", drive_char);
     fnode->device = dev;
     fnode->uid = 0;
     fnode->gid = 0;

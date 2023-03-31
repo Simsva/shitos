@@ -42,13 +42,9 @@ void kmain(struct kernel_args *args) {
     printf("fs_tree:\n");
     tree_debug_dump(fs_tree, tree_print_fs);
 
-    fs_node_t *ada = kopen("/dev/ada", 0);
-    uint16_t magic;
-    fs_read(ada, 0x1fe, 2, (uint8_t *)&magic);
-    printf("/dev/ada MBR magic: %04X\n", magic);
-    /* Will make the ISO unbootable */
-    /* magic = 0x1337; */
-    /* fs_write(ada, 0x1fe, 2, (uint8_t *)&magic); */
+    char buf[16];
+    snprintf(buf, sizeof buf, "/dev/ada%d", 1);
+    printf("buf: %s\n", buf);
 
     for(;;) asm volatile("hlt");
 }
