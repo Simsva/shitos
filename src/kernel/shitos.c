@@ -5,13 +5,13 @@
 #include <stdio.h>
 
 #include <kernel/fs.h>
-#include <kernel/pci.h>
 
 #define STR(s) #s
 #define EXPAND_STR(s) STR(s)
 
 /* TODO: move */
 void ps2hid_install(void);
+void ide_init(void);
 
 static void tree_print_fs(tree_item_t item) {
     struct vfs_entry *entry = item;
@@ -19,12 +19,6 @@ static void tree_print_fs(tree_item_t item) {
         printf("%s -> %p : %u\n", entry->name, entry->file->device, entry->file->inode);
     else
         printf("%s\n", entry->name);
-}
-
-/* detect some Intel IDE controller device */
-static void find_ata_pci(pci_device_t dev, uint16_t vnid, uint16_t dvid, void *extra) {
-    if(vnid == 0x8086 && (dvid == 0x7010 || dvid == 0x7111))
-        *(pci_device_t *)extra = dev;
 }
 
 void kmain(struct kernel_args *args) {
@@ -37,16 +31,19 @@ void kmain(struct kernel_args *args) {
     random_install();
     console_install();
     ps2hid_install();
+    ide_init();
 
     puts("Booting ShitOS (" EXPAND_STR(_ARCH) ")");
 
     printf("fs_tree:\n");
     tree_debug_dump(fs_tree, tree_print_fs);
 
-    pci_device_t ata_dev = (pci_device_t){ .raw = 0 };
-    pci_scan(find_ata_pci, -1, &ata_dev);
-
-    printf("IDE: bus:%u slot:%u func:%u\n", ata_dev.bus, ata_dev.slot, ata_dev.func);
+    fs_node_t *ada = kopen("/dev/ada", 0);
+    uint8_t buf[32];
+    fs_read(ada, 0, sizeof buf, buf);
+    printf("/dev/ada LBA 0: ");
+    for(uint8_t i = 0; i < sizeof buf; i++)
+        printf("%02X ", buf[i]);
 
     for(;;) asm("hlt");
 }

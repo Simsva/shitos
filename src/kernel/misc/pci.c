@@ -83,7 +83,8 @@ void pci_scan(pci_func_t f, int32_t type, void *extra) {
     }
     if(hit) return;
 
-    for(uint8_t bus = 0; bus <= 255; bus++)
+
+    for(uint16_t bus = 0; bus < 256; bus++)
         for(uint8_t slot = 0; slot < 32; slot++)
             pci_scan_slot(f, type, bus, slot, extra);
 }

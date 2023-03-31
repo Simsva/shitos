@@ -69,7 +69,7 @@ static inline uint8_t kbd_write(uint8_t byte) {
 }
 
 /* write all scancodes directly to the kbd pipe */
-static void kbd_handler(struct int_regs *r) {
+static void kbd_handler(__unused struct int_regs *r) {
     uint8_t byte = inportb(PS2_DATA);
     fs_write(kbd_pipe, 0, 1, &byte);
 }
