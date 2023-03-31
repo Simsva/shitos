@@ -93,7 +93,7 @@ $(ISO): mbr $(BOOTPART) $(EXTPART)
 	@echo "ISO	partition.sh"
 	@rm $(ISO) 2>/dev/null || echo jank >/dev/null
 	@./partition.sh -vfm "$(MBR)" "$(ISO)" \
-		"$(BOOTPART):13::y" "$(EXTPART):linux"
+		"$(BOOTPART):13::y" "$(EXTPART):linux::y"
 
 
 .PHONY: all clean dirs debug structs mbr stage1 stage2 kernel libc iso

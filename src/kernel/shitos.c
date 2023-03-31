@@ -16,6 +16,7 @@ struct kernel_args kernel_args;
 /* TODO: move */
 void ps2hid_install(void);
 void ide_init(void);
+void dospart_init(void);
 
 static void tree_print_fs(tree_item_t item) {
     struct vfs_entry *entry = item;
@@ -37,6 +38,9 @@ void kmain(struct kernel_args *args) {
     random_install();
     ps2hid_install();
     ide_init();
+    dospart_init();
+    /* TODO: automatically detect devices somehow */
+    vfs_mount_type("dospart", "/dev/ada", NULL);
 
     puts("Booting ShitOS (" EXPAND_STR(_ARCH) ")");
 

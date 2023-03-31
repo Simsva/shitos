@@ -1,8 +1,9 @@
 #include <kernel/fs.h>
 
+#include <kernel/hashmap.h>
+#include <kernel/kmem.h>
 #include <features.h>
 #include <fcntl.h>
-#include <kernel/kmem.h>
 #include <string.h>
 
 #define MAX_SYMLINK_DEPTH 8
@@ -14,6 +15,7 @@
 #define TREE_TO_FS_NODE(tree_node) (((struct vfs_entry *)((tree_node)->value))->file)
 
 tree_t *fs_tree = NULL;
+static hashmap_t *fs_types = NULL;
 
 ssize_t fs_read(struct fs_node *node, off_t off, size_t sz, uint8_t *buf) {
     if(!node) return -1;
@@ -59,6 +61,7 @@ int fs_readlink(fs_node_t *node, char *buf, size_t sz) {
 
 void vfs_install(void) {
     fs_tree = tree_create();
+    fs_types = hashmap_create_str(5);
 
     struct vfs_entry *root = kmalloc(sizeof(struct vfs_entry));
     root->name = strdup("[root]");
@@ -114,6 +117,12 @@ static fs_node_t *vfs_mapper(void) {
     fnode->flags = FS_TYPE_DIR;
     fnode->readdir = readdir_mapper;
     return fnode;
+}
+
+int vfs_register_type(const char *type, vfs_mount_t mount) {
+    if(hashmap_has(fs_types, type)) return 1;
+    hashmap_set(fs_types, type, mount);
+    return 0;
 }
 
 void *vfs_mount(const char *path, fs_node_t *local_root) {
@@ -187,6 +196,30 @@ void *vfs_mount(const char *path, fs_node_t *local_root) {
 
     kfree(p);
     return retval;
+}
+
+int vfs_mount_type(const char *type, const char *arg, const char *mountpoint) {
+    vfs_mount_t mount = hashmap_get(fs_types, type);
+    if(!mount) {
+        /* Unknown filesystem */
+        /* TODO: ENODEV */
+        return -1;
+    }
+
+    fs_node_t *node = mount(arg, mountpoint);
+
+    /* HACK: let partition mappers not return a node to mount */
+    if((uintptr_t)node == 1) return 0;
+    if(!node) return -1; /* TODO: EINVAL */
+
+    tree_node_t *tnode = vfs_mount(mountpoint, node);
+    if(tnode && tnode->value) {
+        struct vfs_entry *entry = tnode->value;
+        entry->fs_type = strdup(type);
+        entry->args = strdup(arg);
+    }
+
+    return 0;
 }
 
 void vfs_map_directory(const char *path) {

@@ -68,6 +68,8 @@ struct vfs_entry {
     char *fs_type;         /* filesystem type */
 };
 
+typedef fs_node_t *(*vfs_mount_t)(const char *, const char *);
+
 extern tree_t *fs_tree;
 extern fs_node_t *console_dev; /* TODO: move this */
 
@@ -84,7 +86,9 @@ void random_install(void);
 void zero_install(void);
 void console_install(void);
 
+int vfs_register_type(const char *type, vfs_mount_t mount);
 void *vfs_mount(const char *path, fs_node_t *root);
+int vfs_mount_type(const char *type, const char *arg, const char *mountpoint);
 void vfs_map_directory(const char *path);
 
 char *canonicalize_path(const char *cwd, const char *path, size_t *length);
