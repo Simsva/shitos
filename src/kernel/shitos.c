@@ -1,13 +1,16 @@
 #include <kernel/tty/tm.h>
-#include <boot/def.h>
-#include <boot/boot_opts.h>
-#include <sys/utils.h>
+#include <kernel/args.h>
 #include <stdio.h>
+#include <string.h>
+
+#include <kernel/arch/i386/ports.h>
 
 #include <kernel/fs.h>
 
 #define STR(s) #s
 #define EXPAND_STR(s) STR(s)
+
+struct kernel_args kernel_args;
 
 /* TODO: move */
 void ps2hid_install(void);
@@ -24,12 +27,13 @@ static void tree_print_fs(tree_item_t item) {
 void kmain(struct kernel_args *args) {
     tm_cur_x = args->tm_cursor % 80;
     tm_cur_y = args->tm_cursor / 80;
+    memcpy(&kernel_args, args, sizeof kernel_args);
 
     vfs_install();
     vfs_map_directory("/dev");
+    console_install();
     zero_install();
     random_install();
-    console_install();
     ps2hid_install();
     ide_init();
 
@@ -39,11 +43,9 @@ void kmain(struct kernel_args *args) {
     tree_debug_dump(fs_tree, tree_print_fs);
 
     fs_node_t *ada = kopen("/dev/ada", 0);
-    uint8_t buf[32];
-    fs_read(ada, 0, sizeof buf, buf);
-    printf("/dev/ada LBA 0: ");
-    for(uint8_t i = 0; i < sizeof buf; i++)
-        printf("%02X ", buf[i]);
+    uint16_t magic;
+    fs_read(ada, 0x1fe, 2, (uint8_t *)&magic);
+    printf("/dev/ada MBR magic: %04X\n", magic);
 
-    for(;;) asm("hlt");
+    for(;;) asm volatile("hlt");
 }

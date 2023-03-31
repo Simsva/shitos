@@ -2,6 +2,7 @@
  * @brief (P)ATA / IDE disk driver
  */
 #include <kernel/fs.h>
+#include <kernel/args.h>
 #include <kernel/pci.h>
 #include <kernel/kmem.h>
 #include <kernel/vmem.h>
@@ -92,8 +93,8 @@
 #define ATA_WRITE                 0x01
 
 #define ATA_SECTOR_SZ             512
-#define ATA_CACHE_SZ              PAGE_SIZE
-#define ATA_SECTORS_PER_CACHE_BLK (ATA_CACHE_SZ/ATA_SECTOR_SZ)
+#define ATA_BLOCK_SZ              PAGE_SIZE
+#define ATA_SECTORS_PER_BLOCK     (ATA_BLOCK_SZ/ATA_SECTOR_SZ)
 
 typedef union {
     uint64_t raw;
@@ -101,18 +102,6 @@ typedef union {
         uint32_t lo, hi;
     };
 } lba48_t;
-
-typedef struct ide_device {
-   uint8_t reserved;
-   uint8_t channel;
-   uint8_t drive;
-   uint16_t type;
-   uint16_t signature;
-   uint16_t capabilities;
-   uint32_t command_sets;
-   uint32_t size;
-   uint8_t model[41];
-} ide_device_t;
 
 typedef struct ata_identify {
     uint16_t flags;
@@ -171,14 +160,17 @@ static fs_node_t *ata_device_create(ata_device_t *dev);
 static void find_ide_pci(pci_device_t dev, uint16_t vnid, uint16_t dvid, void *extra);
 
 static void ata_device_init(ata_device_t *dev);
-static void ata_device_read_sector(ata_device_t *dev, lba48_t lba, uint8_t *buf);
-static void ata_device_read_sector_internal(ata_device_t *dev, lba48_t lba);
+static void ata_device_read_block(ata_device_t *dev, lba48_t lba, uint8_t *buf);
+static void ata_device_read_block_internal(ata_device_t *dev, lba48_t lba);
 static void ata_irq_handler(struct int_regs *r);
 
 static off_t ata_max_offset(ata_device_t *dev);
 static ssize_t ata_read(fs_node_t *node, off_t off, size_t sz, uint8_t *buf);
 
 void ide_init(void);
+
+#define DPRINTF(fmt, ...) if(kernel_args.boot_options & BOOT_OPT_VERBOSE) { \
+        printf(fmt, __VA_ARGS__); }
 
 static void ata_io_wait(ata_device_t *dev) {
     inportb(dev->io_base + ATA_REG_ALTSTATUS);
@@ -212,7 +204,7 @@ static void ata_device_detect(ata_device_t *dev) {
     outportb(dev->io_base + ATA_REG_HDDEVSEL, 0xa0 | dev->slave << 4);
     ata_io_wait(dev);
     if(ata_status_wait(dev, 10000) & ATA_STATUS_ERR) {
-        printf("ide: %04X[%u] not ATA\n", dev->io_base, dev->slave);
+        DPRINTF("ide: %04X[%u] not ATA\n", dev->io_base, dev->slave);
         return;
     }
 
@@ -220,13 +212,13 @@ static void ata_device_detect(ata_device_t *dev) {
     uint8_t ch = inportb(dev->io_base + ATA_REG_LBA2);
 
     if(cl == 0xff && ch == 0xff) {
-        printf("ide: %04X[%u] nothing found\n", dev->io_base, dev->slave);
+        DPRINTF("ide: %04X[%u] nothing found\n", dev->io_base, dev->slave);
         return;
     }
     if((cl == 0x00 && ch == 0x00)
        || (cl == 0x3c && ch == 0xc3)) {
         /* PATA or emulated SATA */
-        printf("ide: %04X[%u] PATA or emu SATA\n", dev->io_base, dev->slave);
+        DPRINTF("ide: %04X[%u] PATA or emu SATA\n", dev->io_base, dev->slave);
 
         ata_device_init(dev);
 
@@ -248,11 +240,11 @@ static void ata_device_detect(ata_device_t *dev) {
     if((cl == 0x14 && ch == 0xeb)
        || (cl == 0x69 && ch == 0x96)) {
         /* ATAPI */
-        printf("ide: %04X[%u] ATAPI\n", dev->io_base, dev->slave);
+        DPRINTF("ide: %04X[%u] ATAPI\n", dev->io_base, dev->slave);
         return;
     }
 
-    printf("ide: %04X[%u] not recognized\n", dev->io_base, dev->slave);
+    DPRINTF("ide: %04X[%u] not recognized\n", dev->io_base, dev->slave);
     return;
 }
 
@@ -313,7 +305,7 @@ static void ata_device_init(ata_device_t *dev) {
     dev->dma_start_phys = (uintptr_t)vmem_get_paddr(dev->dma_start);
 
     dev->dma_prdt[0].offset = dev->dma_start_phys;
-    dev->dma_prdt[0].bytes = ATA_CACHE_SZ;
+    dev->dma_prdt[0].bytes = ATA_BLOCK_SZ;
     dev->dma_prdt[0].last = 0x8000;
 
     uint32_t cmd_reg = pci_read_register(ide_pci, PCI_COMMAND, 4);
@@ -326,13 +318,16 @@ static void ata_device_init(ata_device_t *dev) {
 }
 
 /* TODO: caching */
-__unused static void ata_device_read_sector(ata_device_t *dev, lba48_t lba, uint8_t *buf) {
-    ata_device_read_sector_internal(dev, lba);
+static void ata_device_read_block(ata_device_t *dev, lba48_t lba, uint8_t *buf) {
+    /* we only read one block at a time, so lba is really
+     * the block address and not the ATA sector address */
+    lba.raw *= ATA_SECTORS_PER_BLOCK;
 
-    memcpy(buf, dev->dma_start, ATA_CACHE_SZ);
+    ata_device_read_block_internal(dev, lba);
+    memcpy(buf, dev->dma_start, ATA_BLOCK_SZ);
 }
 
-static void ata_device_read_sector_internal(ata_device_t *dev, lba48_t lba) {
+static void ata_device_read_block_internal(ata_device_t *dev, lba48_t lba) {
     uint8_t status, dstatus;
     if(dev->is_atapi) return;
 
@@ -362,7 +357,7 @@ static void ata_device_read_sector_internal(ata_device_t *dev, lba48_t lba) {
     outportb(dev->io_base + ATA_REG_LBA1, (lba.hi & 0x000000ff));
     outportb(dev->io_base + ATA_REG_LBA2, (lba.hi & 0x0000ff00) >> 8);
     /* select low 24 bits of LBA */
-    outportb(dev->io_base + ATA_REG_SECCOUNT0, ATA_SECTORS_PER_CACHE_BLK);
+    outportb(dev->io_base + ATA_REG_SECCOUNT0, ATA_SECTORS_PER_BLOCK);
     outportb(dev->io_base + ATA_REG_LBA0, (lba.lo & 0x000000ff) >> 0);
     outportb(dev->io_base + ATA_REG_LBA1, (lba.lo & 0x0000ff00) >> 8);
     outportb(dev->io_base + ATA_REG_LBA2, (lba.lo & 0x00ff0000) >> 16);
@@ -412,12 +407,57 @@ static off_t ata_max_offset(ata_device_t *dev) {
     return sectors.raw * ATA_SECTOR_SZ;
 }
 
-/* XXX: terrible */
 static ssize_t ata_read(fs_node_t *node, off_t off, size_t sz, uint8_t *buf) {
     ata_device_t *dev = node->device;
+    lba48_t start_block = (lba48_t){ .raw = off / ATA_BLOCK_SZ };
+    lba48_t end_block = (lba48_t){ .raw = (off + sz - 1) / ATA_BLOCK_SZ };
+    size_t buf_offset = 0;
 
-    ata_device_read_sector_internal(dev, (lba48_t){ .raw = off });
-    memcpy(buf, dev->dma_start, sz);
+    off_t max_off = ata_max_offset(dev);
+    if(off > max_off) return 0;
+    if(off + (ssize_t)sz > max_off)
+        sz = max_off - off;
+
+    /* if start is not on a block boundary
+     * or if total size is less than one block */
+    if(off % ATA_BLOCK_SZ || sz < ATA_BLOCK_SZ) {
+        size_t prefix_sz = ATA_BLOCK_SZ - (off % ATA_BLOCK_SZ);
+        if(prefix_sz > sz) prefix_sz = sz;
+
+        uint8_t *tmp = kmalloc(ATA_BLOCK_SZ);
+        ata_device_read_block(dev, start_block, tmp);
+
+        memcpy(buf, tmp + (off % ATA_BLOCK_SZ), prefix_sz);
+
+        kfree(tmp);
+        buf_offset += prefix_sz;
+        /* first block is read */
+        start_block.raw++;
+    }
+
+    /* if end is not on a block boundary (and there are actually blocks left to
+     * read after the first case)
+     * if the total size fits within the start block, then do not run this even
+     * though the end is not on a boundary */
+    if((off + sz) % ATA_BLOCK_SZ && start_block.raw <= end_block.raw) {
+        size_t postfix_sz = (off + sz) % ATA_BLOCK_SZ;
+        uint8_t *tmp = kmalloc(ATA_BLOCK_SZ);
+        ata_device_read_block(dev, end_block, tmp);
+
+        memcpy(buf + sz - postfix_sz, tmp, postfix_sz);
+
+        kfree(tmp);
+        /* last block is read */
+        end_block.raw--;
+    }
+
+    /* read the remaining blocks */
+    while(start_block.raw <= end_block.raw) {
+        ata_device_read_block(dev, start_block, buf + buf_offset);
+        buf_offset += ATA_BLOCK_SZ;
+        start_block.raw++;
+    }
+
     return sz;
 }
 

@@ -58,3 +58,4 @@ For more information see `./run.sh -h`.
 ## TODO (remove when done)
 
 - Better directory structure for C code
+- More structured kernel logging
