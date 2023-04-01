@@ -3,6 +3,10 @@
 /* Be careful when using higher half things */
 #include <kernel/vmem.h>
 
+/* this whole file is a big array bounds violation, so just ignore errors */
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Warray-bounds"
+
 #define KERNEL_MAP 0xc0000000
 #define PADDR(a) ((void *)(a) - (KERNEL_MAP))
 #define FCOUNT (*(uint32_t *)PADDR(&frame_count))
@@ -36,13 +40,10 @@ __attribute__((section(".low.text"))) void paging_init(void) {
     /* identity map first page table */
     pd[0] = (uint32_t)ptbase | 0x1;
 
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Warray-bounds"
     /* zero out frame bitset, I do not dare use other higher-half functions in
      * this cursed C code, so no memset */
     for(uint32_t i = 0; i < ((FCOUNT+31) >> 5); i++)
         FRAMES[i] = 0;
-#pragma GCC diagnostic pop
 
     *pdcur++ = (uint32_t)ptbase | 0x1;
     for(;;) {
@@ -76,3 +77,5 @@ __attribute__((section(".low.text"))) void paging_init(void) {
     /* save vaddr of new kmem_head */
     *kmem_head_low = ptbase + 0x1000 + KERNEL_MAP;
 }
+
+#pragma GCC diagnostic pop
