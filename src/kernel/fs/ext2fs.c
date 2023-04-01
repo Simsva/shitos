@@ -451,9 +451,25 @@ static fs_node_t *ext2fs_finddir(fs_node_t *node, char *name) {
     return fnode ? fnode : NULL;
 }
 
-static ssize_t ext2fs_readlink(__unused fs_node_t *node, __unused char *buf, __unused size_t sz) {
-    /* NYI */
-    return -1;
+static ssize_t ext2fs_readlink(fs_node_t *node, char *buf, size_t sz) {
+    ext2_fs_t *fs = node->device;
+    ext2_inode_t *ino = read_inode(fs, node->inode);
+    if(!ino) return -1;
+
+    size_t read_sz = ino->i_size > sz ? sz : ino->i_size;
+
+    /* if the link fits inside the space used for block pointers it will be
+     * stored there instead of in a block */
+    if(ino->i_size > EXT2_N_BLOCKS * sizeof(uint32_t))
+        ext2fs_read(node, 0, read_sz, (uint8_t *)buf);
+    else
+        memcpy(buf, (void *)ino->i_block, read_sz);
+
+    /* sz does not cover the null byte */
+    if(read_sz < sz) buf[read_sz] = '\0';
+
+    kfree(ino);
+    return read_sz;
 }
 
 /**
@@ -474,6 +490,7 @@ static int ext2fs_root(ext2_fs_t *fs, ext2_inode_t *ino, fs_node_t *fnode) {
     fnode->links_count = ino->i_links_count;
 
     /* flags */
+    fnode->flags = 0;
     if((ino->i_mode & EXT2_TYPE_REG) == EXT2_TYPE_REG) {
         DPRINTF(CRITICAL, "root inode is a regular file!");
         return 1;
@@ -482,8 +499,15 @@ static int ext2fs_root(ext2_fs_t *fs, ext2_inode_t *ino, fs_node_t *fnode) {
         DPRINTF(CRITICAL, "root inode is not a directory!");
         return 1;
     }
-    /* TODO: test all other file types */
-    fnode->flags = FS_TYPE_DIR | FS_FLAG_MOUNT;
+    if((ino->i_mode & EXT2_TYPE_BLOCK) == EXT2_TYPE_BLOCK)
+        fnode->flags |= FS_TYPE_BLOCK;
+    if((ino->i_mode & EXT2_TYPE_CHAR) == EXT2_TYPE_CHAR)
+        fnode->flags |= FS_TYPE_CHAR;
+    if((ino->i_mode & EXT2_TYPE_FIFO) == EXT2_TYPE_FIFO)
+        fnode->flags |= FS_TYPE_PIPE;
+    if((ino->i_mode & EXT2_TYPE_LINK) == EXT2_TYPE_LINK)
+        fnode->flags |= FS_TYPE_LINK;
+    fnode->flags |= FS_TYPE_DIR | FS_FLAG_MOUNT;
 
     fnode->read = NULL;
     fnode->write = NULL;

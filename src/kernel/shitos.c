@@ -54,26 +54,12 @@ void kmain(struct kernel_args *args) {
     printf("fs_tree:\n");
     tree_debug_dump(fs_tree, tree_print_fs);
 
-    fs_node_t *kernel = kopen("/shitos.elf", 0),
-              *random = kopen("/dev/random", 0);
-    if(kernel) {
-        printf("found kernel ELF: '%s'\nnow modifying self\n",
-               kernel->name);
+    fs_node_t *txt = kopen("/hej2.txt", 0);
+    uint8_t buf[16];
+    buf[fs_read(txt, 0, sizeof buf, buf)] = '\0';
+    printf("/hej2.txt %zu: %s\n", txt->sz, buf);
 
-        /* address of "Booting ShitOS" string: 0xb598 */
-        uint8_t buf[16];
-        fs_read(kernel, 0xb598, sizeof buf, buf);
-
-        /* randomize 5 chars, it is completely deterministic so it will always
-         * produce the same string */
-        fs_read(random, 0, 5, buf);
-        for(uint8_t i = 0; i < 5; i++) buf[i] = 'A' + buf[i]%26;
-
-        fs_write(kernel, 0xb598, sizeof buf, buf);
-    }
-
-    kfree(kernel);
-    kfree(random);
+    kfree(txt);
 
     for(;;) asm volatile("hlt");
 }
