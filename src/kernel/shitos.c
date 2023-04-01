@@ -54,12 +54,5 @@ void kmain(struct kernel_args *args) {
     printf("fs_tree:\n");
     tree_debug_dump(fs_tree, tree_print_fs);
 
-    fs_node_t *txt = kopen("/hej2.txt", 0);
-    uint8_t buf[16];
-    buf[fs_read(txt, 0, sizeof buf, buf)] = '\0';
-    printf("/hej2.txt %zu: %s\n", txt->sz, buf);
-
-    kfree(txt);
-
     for(;;) asm volatile("hlt");
 }
