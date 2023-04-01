@@ -8,6 +8,7 @@
 #include <kernel/arch/i386/ports.h>
 
 #include <kernel/hashmap.h>
+#include <kernel/kmem.h>
 
 #define STR(s) #s
 #define EXPAND_STR(s) STR(s)
@@ -52,6 +53,27 @@ void kmain(struct kernel_args *args) {
 
     printf("fs_tree:\n");
     tree_debug_dump(fs_tree, tree_print_fs);
+
+    fs_node_t *kernel = kopen("/shitos.elf", 0),
+              *random = kopen("/dev/random", 0);
+    if(kernel) {
+        printf("found kernel ELF: '%s'\nnow modifying self\n",
+               kernel->name);
+
+        /* address of "Booting ShitOS" string: 0xb598 */
+        uint8_t buf[16];
+        fs_read(kernel, 0xb598, sizeof buf, buf);
+
+        /* randomize 5 chars, it is completely deterministic so it will always
+         * produce the same string */
+        fs_read(random, 0, 5, buf);
+        for(uint8_t i = 0; i < 5; i++) buf[i] = 'A' + buf[i]%26;
+
+        fs_write(kernel, 0xb598, sizeof buf, buf);
+    }
+
+    kfree(kernel);
+    kfree(random);
 
     for(;;) asm volatile("hlt");
 }

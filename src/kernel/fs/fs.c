@@ -41,14 +41,14 @@ void fs_close(struct fs_node *node) {
 
 struct dirent *fs_readdir(struct fs_node *node, off_t idx) {
     if(!node) return NULL;
-    if(node->readdir && (node->flags & FS_FLAG_TYPE_MASK) == FS_TYPE_DIR)
+    if(node->readdir && node->flags & FS_TYPE_DIR)
         return node->readdir(node, idx);
     else return NULL;
 }
 
 fs_node_t *fs_finddir(fs_node_t *node, char *name) {
     if(!node) return NULL;
-    if(node->finddir && (node->flags & FS_FLAG_TYPE_MASK) == FS_TYPE_DIR)
+    if(node->finddir && node->flags & FS_TYPE_DIR)
         return node->finddir(node, name);
     else return NULL;
 }
@@ -395,7 +395,7 @@ static fs_node_t *kopen_recur(const char *file, unsigned flags, unsigned symlink
          * O_PATH are set. However, if they are set we should not follow a
          * symlink if it is the "leaf" of the path.
          */
-         if((node->flags & FS_FLAG_TYPE_MASK) == FS_TYPE_LINK &&
+         if(node->flags & FS_TYPE_LINK &&
             !((flags & O_NOFOLLOW) && (flags & O_PATH) && depth == path_depth)) {
              if((flags & O_NOFOLLOW) && depth == path_depth - 1) {
                  /* TODO: ELOOP */

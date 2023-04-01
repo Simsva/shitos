@@ -9,16 +9,14 @@
 #include <kernel/tree.h>
 
 /* fs_node::flags */
-/* first three bits are reserved for the filetype */
-#define FS_FLAG_TYPE_MASK 07
-#define FS_TYPE_FILE      01
-#define FS_TYPE_DIR       02
-#define FS_TYPE_CHAR      03
-#define FS_TYPE_BLOCK     04
-#define FS_TYPE_PIPE      05
-#define FS_TYPE_LINK      06
+#define FS_TYPE_FILE      0x01
+#define FS_TYPE_DIR       0x02
+#define FS_TYPE_CHAR      0x04
+#define FS_TYPE_BLOCK     0x08
+#define FS_TYPE_PIPE      0x10
+#define FS_TYPE_LINK      0x20
 
-#define FS_FLAG_MOUNT     0x08    /* is mountpoint? */
+#define FS_FLAG_MOUNT     0x40    /* is mountpoint? */
 
 #define PATH_SEPARATOR     '/'
 #define PATH_SEPARATOR_STR "/"

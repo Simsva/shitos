@@ -547,10 +547,10 @@ static ssize_t ata_write(fs_node_t *node, off_t off, size_t sz, uint8_t *buf) {
         sz = max_off - off;
 
     /* if start is not on a block boundary
-     * unlike when reading we don't need to worry
-     * about the size being lower than the block size */
+     * or if total size is less than one block */
     if(off % ATA_BLOCK_SZ) {
         size_t prefix_sz = ATA_BLOCK_SZ - (off % ATA_BLOCK_SZ);
+        if(prefix_sz > sz) prefix_sz = sz;
 
         uint8_t *tmp = kmalloc(ATA_BLOCK_SZ);
         ata_device_read_block(dev, start_block, tmp);
