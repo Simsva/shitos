@@ -58,6 +58,7 @@ typedef struct fs_node {
 
     struct fs_node *ptr;   /* alias pointer, for symlinks */
     intmax_t refcount;
+    intmax_t links_count;  /* number of hard links to this node */
 } fs_node_t;
 
 struct vfs_entry {

@@ -62,6 +62,7 @@ int fs_readlink(fs_node_t *node, char *buf, size_t sz) {
 void vfs_install(void) {
     fs_tree = tree_create();
     fs_types = hashmap_create_str(5);
+    fs_types->value_free = NULL;
 
     struct vfs_entry *root = kmalloc(sizeof(struct vfs_entry));
     root->name = strdup("[root]");
@@ -72,7 +73,7 @@ void vfs_install(void) {
     tree_set_root(fs_tree, root);
 }
 
-static struct dirent *readdir_mapper(fs_node_t *node, off_t idx) {
+static struct dirent *mapper_readdir(fs_node_t *node, off_t idx) {
     tree_node_t *d = (tree_node_t *)node->device;
 
     if(!d) return NULL;
@@ -113,9 +114,10 @@ static struct dirent *readdir_mapper(fs_node_t *node, off_t idx) {
 static fs_node_t *vfs_mapper(void) {
     fs_node_t *fnode = kmalloc(sizeof(fs_node_t));
     memset(fnode, 0, sizeof(fs_node_t));
+    strcpy(fnode->name, "mapped");
     fnode->mask = 0555;
     fnode->flags = FS_TYPE_DIR;
-    fnode->readdir = readdir_mapper;
+    fnode->readdir = mapper_readdir;
     return fnode;
 }
 
@@ -225,10 +227,7 @@ int vfs_mount_type(const char *type, const char *arg, const char *mountpoint) {
 void vfs_map_directory(const char *path) {
     fs_node_t *f = vfs_mapper();
     struct vfs_entry *entry = vfs_mount(path, f);
-    if(!strcmp(path, "/"))
-        f->device = fs_tree->root;
-    else
-        f->device = entry;
+    f->device = entry;
 }
 
 /* canonicalize a path relative to cwd

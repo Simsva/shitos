@@ -1,6 +1,7 @@
 #include <kernel/tty/tm.h>
 #include <kernel/fs.h>
 #include <kernel/args.h>
+#include <ext2fs/ext2.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -20,10 +21,12 @@ void dospart_init(void);
 
 static void tree_print_fs(tree_item_t item) {
     struct vfs_entry *entry = item;
+    printf("%s", entry->name);
+    if(entry->fs_type)
+        printf("[%s]", entry->fs_type);
     if(entry->file)
-        printf("%s -> %p : %u\n", entry->name, entry->file->device, entry->file->inode);
-    else
-        printf("%s\n", entry->name);
+        printf(" -> %s : %u", entry->file->name, entry->file->inode);
+    putchar('\n');
 }
 
 void kmain(struct kernel_args *args) {
@@ -39,28 +42,16 @@ void kmain(struct kernel_args *args) {
     ps2hid_install();
     ide_init();
     dospart_init();
+    ext2fs_init();
+
     /* TODO: automatically detect devices somehow */
     vfs_mount_type("dospart", "/dev/ada", NULL);
+    vfs_mount_type("ext2fs", "/dev/ada1,rw,verbose", "/");
 
     puts("Booting ShitOS (" EXPAND_STR(_ARCH) ")");
 
     printf("fs_tree:\n");
     tree_debug_dump(fs_tree, tree_print_fs);
-
-    hashmap_t *map = hashmap_create_str(2);
-    map->value_free = NULL;
-    hashmap_set(map, "hello", (void *)13);
-    hashmap_set(map, "world", (void *)37);
-    hashmap_set(map, "foo", (void *)69);
-    hashmap_set(map, "bar", (void *)96);
-
-    hashmap_delete(map, "world");
-
-    printf("hello world foo bar : %d %d %d %d\n",
-           (int)hashmap_get(map, "hello"), (int)hashmap_get(map, "world"),
-           (int)hashmap_get(map, "foo"), (int)hashmap_get(map, "bar"));
-
-    hashmap_free(map);
 
     for(;;) asm volatile("hlt");
 }

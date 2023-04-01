@@ -1,5 +1,5 @@
-#ifndef EXT2_FS_H_
-#define EXT2_FS_H_
+#ifndef EXT2FS_EXT2_FS_H_
+#define EXT2FS_EXT2_FS_H_
 
 #include <stdint.h>
 
@@ -180,4 +180,4 @@ struct ext2_dir_entry {
     char     name[255];
 };
 
-#endif // EXT2_FS_H_
+#endif // EXT2FS_EXT2_FS_H_
