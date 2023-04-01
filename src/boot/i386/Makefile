@@ -22,7 +22,7 @@ clean:
 	@echo Cleaning boot
 	@rm -f $(BUILDFILES)
 
-	@(cd $(ROOT)/src/boot/$(ARCH)/stage2 && env make clean)
+	@(cd $(ROOT)/src/boot/$(ARCH)/stage2 && $(MAKE) clean)
 
 
 include $(ROOT)/include/mk/compile.mk
@@ -49,9 +49,9 @@ $(STAGE1_ELF): $(STAGE1_OBJ)
 
 
 stage2:
-	@(cd $(ROOT)/src/boot/$(ARCH)/stage2 && env make stage2 install)
+	@(cd $(ROOT)/src/boot/$(ARCH)/stage2 && $(MAKE) stage2 install)
 install_headers:
-	@(cd $(ROOT)/src/boot/$(ARCH)/stage2 && env make install_headers)
+	@(cd $(ROOT)/src/boot/$(ARCH)/stage2 && $(MAKE) install_headers)
 
 
 .PHONY: all clean mbr stage1 stage2
