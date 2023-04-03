@@ -7,8 +7,8 @@
 
 #include <kernel/arch/i386/ports.h>
 
-#include <kernel/hashmap.h>
 #include <kernel/kmem.h>
+#include <sys/stat.h>
 
 #define STR(s) #s
 #define EXPAND_STR(s) STR(s)
@@ -47,7 +47,7 @@ void kmain(struct kernel_args *args) {
 
     /* TODO: automatically detect devices somehow */
     vfs_mount_type("dospart", "/dev/ada", NULL);
-    vfs_mount_type("ext2fs", "/dev/ada1,rw,verbose", "/");
+    vfs_mount_type("ext2fs", "/dev/ada2,rw,verbose", "/");
 
     puts("Booting ShitOS (" EXPAND_STR(_ARCH) ")");
 

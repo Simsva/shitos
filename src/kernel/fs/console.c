@@ -24,7 +24,7 @@ static fs_node_t *console_dev_create(void) {
     fnode->uid = 0;
     fnode->gid = 0;
     fnode->mask = 0660;
-    fnode->flags = FS_TYPE_CHAR;
+    fnode->flags = FS_FLAG_IFCHR;
     fnode->write = console_write;
     return fnode;
 }

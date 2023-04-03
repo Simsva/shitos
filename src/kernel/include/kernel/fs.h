@@ -9,14 +9,25 @@
 #include <kernel/tree.h>
 
 /* fs_node::flags */
-#define FS_TYPE_FILE      0x01
-#define FS_TYPE_DIR       0x02
-#define FS_TYPE_CHAR      0x04
-#define FS_TYPE_BLOCK     0x08
-#define FS_TYPE_PIPE      0x10
-#define FS_TYPE_LINK      0x20
+/* first 4 bits reserved to filetype */
+#define FS_FLAG_IFMT    017
+#define FS_FLAG_IFDIR   004
+#define FS_FLAG_IFCHR   002
+#define FS_FLAG_IFBLK   006
+#define FS_FLAG_IFREG   010
+#define FS_FLAG_IFIFO   001
+#define FS_FLAG_IFLNK   012
+#define FS_FLAG_IFSOCK  014
 
-#define FS_FLAG_MOUNT     0x40    /* is mountpoint? */
+#define FS_ISDIR(mode)  (((mode) & FS_FLAG_IFMT) == FS_FLAG_IFDIR)
+#define FS_ISCHR(mode)  (((mode) & FS_FLAG_IFMT) == FS_FLAG_IFCHR)
+#define FS_ISBLK(mode)  (((mode) & FS_FLAG_IFMT) == FS_FLAG_IFBLK)
+#define FS_ISREG(mode)  (((mode) & FS_FLAG_IFMT) == FS_FLAG_IFREG)
+#define FS_ISFIFO(mode) (((mode) & FS_FLAG_IFMT) == FS_FLAG_IFIFO)
+#define FS_ISLNK(mode)  (((mode) & FS_FLAG_IFMT) == FS_FLAG_IFLNK)
+#define FS_ISSOCK(mode) (((mode) & FS_FLAG_IFMT) == FS_FLAG_IFSOCK)
+
+#define FS_FLAG_MOUNT   0x10    /* is mountpoint */
 
 #define PATH_SEPARATOR     '/'
 #define PATH_SEPARATOR_STR "/"
@@ -30,8 +41,16 @@ typedef ssize_t (*write_type_t)(struct fs_node *, off_t, size_t, uint8_t *);
 typedef void (*open_type_t)(struct fs_node *, unsigned);
 typedef void (*close_type_t)(struct fs_node *);
 typedef struct dirent *(*readdir_type_t)(struct fs_node *, off_t);
-typedef struct fs_node *(*finddir_type_t)(struct fs_node *, char *);
+typedef struct fs_node *(*finddir_type_t)(struct fs_node *, const char *);
 typedef ssize_t (*readlink_type_t)(struct fs_node *, char *, size_t);
+typedef int (*truncate_type_t)(struct fs_node *, size_t);
+typedef int (*mknod_type_t)(struct fs_node *, const char *, mode_t);
+typedef int (*unlink_type_t)(struct fs_node *, const char *);
+typedef int (*link_type_t)(struct fs_node *, const char *, struct fs_node *);
+typedef int (*symlink_type_t)(struct fs_node *, const char *, const char *);
+typedef int (*chmod_type_t)(struct fs_node *, mode_t);
+typedef int (*chown_type_t)(struct fs_node *, uid_t, gid_t);
+typedef int (*ioctl_type_t)(struct fs_node *, unsigned long, void *);
 
 typedef struct fs_node {
     char name[256];        /* filename */
@@ -53,6 +72,14 @@ typedef struct fs_node {
     readdir_type_t readdir;
     finddir_type_t finddir;
     readlink_type_t readlink;
+    truncate_type_t truncate;
+    mknod_type_t mknod;
+    unlink_type_t unlink;
+    link_type_t link;
+    symlink_type_t symlink;
+    chmod_type_t chmod;
+    chown_type_t chown;
+    ioctl_type_t ioctl;
 
     struct fs_node *ptr;   /* alias pointer, for symlinks */
     intmax_t refcount;
@@ -77,8 +104,16 @@ ssize_t fs_write(fs_node_t *node, off_t off, size_t sz, uint8_t *buf);
 void fs_open(fs_node_t *node, unsigned flags);
 void fs_close(fs_node_t *node);
 struct dirent *fs_readdir(fs_node_t *node, off_t idx);
-fs_node_t *fs_finddir(fs_node_t *node, char *name);
+fs_node_t *fs_finddir(fs_node_t *node, const char *name);
 int fs_readlink(fs_node_t *node, char *buf, size_t sz);
+int fs_truncate(fs_node_t *node, size_t sz);
+int fs_mknod(const char *path, mode_t mode);
+int fs_unlink(const char *path);
+int fs_link(const char *oldpath, const char *newpath);
+int fs_symlink(const char *target, const char *path);
+int fs_chmod(fs_node_t *node, mode_t mode);
+int fs_chown(fs_node_t *node, uid_t uid, gid_t gid);
+int fs_ioctl(fs_node_t *node, unsigned long request, void *argp);
 
 void vfs_install(void);
 void random_install(void);

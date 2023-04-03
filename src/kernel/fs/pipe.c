@@ -79,7 +79,7 @@ fs_node_t *pipe_create(size_t sz) {
     fnode->uid = 0;
     fnode->gid = 0;
     fnode->mask = 0666;
-    fnode->flags = FS_TYPE_PIPE;
+    fnode->flags = FS_FLAG_IFIFO;
     fnode->read = pipe_read;
     fnode->write = pipe_write;
 

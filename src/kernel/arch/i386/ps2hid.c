@@ -76,7 +76,7 @@ static void kbd_handler(__unused struct int_regs *r) {
 
 void ps2hid_install(void) {
     kbd_pipe = pipe_create(128);
-    kbd_pipe->flags = FS_TYPE_CHAR;
+    kbd_pipe->flags = FS_FLAG_IFCHR;
     vfs_mount("/dev/kbd", kbd_pipe);
 
     /* disable all ports when configuring */

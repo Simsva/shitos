@@ -1,5 +1,7 @@
 /**
  * @brief EXT2 filesystem driver
+ *
+ * TODO: free blocks, allocate/free inodes
  */
 #include <ext2fs/ext2.h>
 #include <kernel/fs.h>
@@ -9,6 +11,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <strings.h>
+#include <errno.h>
 
 #define DPRINTF(lvl, fmt, ...) if(fs->flags & EXT2_FLAG_VERBOSE) { \
     printf("ext2fs [%s]: " fmt, #lvl __VA_OPT__(,) __VA_ARGS__); }
@@ -42,7 +45,7 @@ static ssize_t ext2fs_write(fs_node_t *node, off_t off, size_t sz, uint8_t *buf)
 static void ext2fs_open(fs_node_t *node, unsigned flags);
 static void ext2fs_close(fs_node_t *node);
 static struct dirent *ext2fs_readdir(fs_node_t *node, off_t idx);
-static fs_node_t *ext2fs_finddir(fs_node_t *node, char *name);
+static fs_node_t *ext2fs_finddir(fs_node_t *node, const char *name);
 static ssize_t ext2fs_readlink(fs_node_t *node, char *buf, size_t sz);
 
 /* filesystem operations */
@@ -233,7 +236,7 @@ static ssize_t write_buffer_inode(ext2_fs_t *fs, ext2_inode_t *ino, uint32_t ino
  * refresh_inode reads an inode from the filesystem into ino.
  */
 static int refresh_inode(ext2_fs_t *fs, ext2_inode_t *ino, uint32_t ino_no) {
-    uint32_t bg, bgi;
+    uint32_t bg, bgi, bgoff;
     ext2_inode_t *inodes;
     /* inodes start at 1 */
     if(ino_no-- == 0) {
@@ -241,8 +244,10 @@ static int refresh_inode(ext2_fs_t *fs, ext2_inode_t *ino, uint32_t ino_no) {
         return E_BADBLOCK;
     }
 
-    bg  = ino_no / fs->inodes_per_group;
-    bgi = ino_no % fs->inodes_per_group;
+    bg    = ino_no / fs->inodes_per_group;
+    bgi   = ino_no % fs->inodes_per_group;
+    bgoff = (ino_no * fs->inode_sz) / fs->block_sz;
+    bgi   = (bgi * fs->inode_sz) % fs->block_sz;
 
     if(bg > fs->bgdt_sz) {
         DPRINTF(ERROR, "attempting to read an inode outside the BGDT\n");
@@ -250,8 +255,8 @@ static int refresh_inode(ext2_fs_t *fs, ext2_inode_t *ino, uint32_t ino_no) {
     }
 
     inodes = kmalloc(fs->block_sz);
-    read_block(fs, fs->bgdt[bg].bg_inode_table, (void *)inodes);
-    memcpy(ino, (void *)inodes + bgi*fs->inode_sz, fs->inode_sz);
+    read_block(fs, fs->bgdt[bg].bg_inode_table + bgoff, (void *)inodes);
+    memcpy(ino, (void *)inodes + bgi, fs->inode_sz);
     kfree(inodes);
 
     return E_SUCCESS;
@@ -275,7 +280,7 @@ static ext2_inode_t *read_inode(ext2_fs_t *fs, uint32_t ino) {
  * write_inode writes an inode to the filesystem at the specified inode number.
  */
 static int write_inode(ext2_fs_t *fs, ext2_inode_t *ino, uint32_t ino_no) {
-    uint32_t bg, bgi;
+    uint32_t bg, bgi, bgoff;
     ext2_inode_t *inodes;
     /* inodes start at 1 */
     if(ino_no-- == 0) {
@@ -283,8 +288,10 @@ static int write_inode(ext2_fs_t *fs, ext2_inode_t *ino, uint32_t ino_no) {
         return E_BADBLOCK;
     }
 
-    bg  = ino_no / fs->inodes_per_group;
-    bgi = ino_no % fs->inodes_per_group;
+    bg    = ino_no / fs->inodes_per_group;
+    bgi   = ino_no % fs->inodes_per_group;
+    bgoff = (ino_no * fs->inode_sz) / fs->block_sz;
+    bgi   = (bgi * fs->inode_sz) % fs->block_sz;
 
     if(bg > fs->bgdt_sz) {
         DPRINTF(ERROR, "attempting to write an inode outside the BGDT\n");
@@ -292,9 +299,9 @@ static int write_inode(ext2_fs_t *fs, ext2_inode_t *ino, uint32_t ino_no) {
     }
 
     inodes = kmalloc(fs->block_sz);
-    read_block(fs, fs->bgdt[bg].bg_inode_table, (void *)inodes);
-    memcpy((void *)inodes + bgi*fs->inode_sz, ino, fs->inode_sz);
-    write_block(fs, fs->bgdt[bg].bg_inode_table, (void *)inodes);
+    read_block(fs, fs->bgdt[bg].bg_inode_table + bgoff, (void *)inodes);
+    memcpy((void *)inodes + bgi, ino, fs->inode_sz);
+    write_block(fs, fs->bgdt[bg].bg_inode_table + bgoff, (void *)inodes);
     kfree(inodes);
 
     return E_SUCCESS;
@@ -729,34 +736,40 @@ static fs_node_t *fnode_from_dirent(ext2_fs_t *fs, ext2_inode_t *ino, ext2_dir_e
 
     /* flags */
     fnode->flags = 0;
-    if((ino->i_mode & EXT2_TYPE_REG) == EXT2_TYPE_REG) {
-        fnode->flags |= FS_TYPE_FILE;
+    switch(ino->i_mode & EXT2_TYPE_MASK) {
+    case EXT2_TYPE_REG:
+        fnode->flags |= FS_FLAG_IFREG;
         fnode->read = ext2fs_read;
         fnode->write = ext2fs_write;
-    }
-    if((ino->i_mode & EXT2_TYPE_DIR) == EXT2_TYPE_DIR) {
-        fnode->flags |= FS_TYPE_DIR;
-        fnode->read = NULL;
-        fnode->write = NULL;
+        break;
+
+    case EXT2_TYPE_DIR:
+        fnode->flags |= FS_FLAG_IFDIR;
         fnode->readdir = ext2fs_readdir;
         fnode->finddir = ext2fs_finddir;
-    }
-    if((ino->i_mode & EXT2_TYPE_BLOCK) == EXT2_TYPE_BLOCK) {
-        fnode->flags |= FS_TYPE_BLOCK;
-    }
-    if((ino->i_mode & EXT2_TYPE_CHAR) == EXT2_TYPE_CHAR) {
-        fnode->flags |= FS_TYPE_CHAR;
-    }
-    if((ino->i_mode & EXT2_TYPE_FIFO) == EXT2_TYPE_FIFO) {
-        fnode->flags |= FS_TYPE_PIPE;
-    }
-    if((ino->i_mode & EXT2_TYPE_LINK) == EXT2_TYPE_LINK) {
-        fnode->flags |= FS_TYPE_LINK;
-        fnode->read = NULL;
-        fnode->write = NULL;
-        fnode->readdir = NULL;
-        fnode->finddir = NULL;
+        break;
+
+    case EXT2_TYPE_BLOCK:
+        fnode->flags |= FS_FLAG_IFBLK;
+        break;
+
+    case EXT2_TYPE_CHAR:
+        fnode->flags |= FS_FLAG_IFCHR;
+        break;
+
+    case EXT2_TYPE_FIFO:
+        fnode->flags |= FS_FLAG_IFIFO;
+        break;
+
+    case EXT2_TYPE_LINK:
+        fnode->flags |= FS_FLAG_IFLNK;
         fnode->readlink = ext2fs_readlink;
+        break;
+
+    default:
+        /* bad type */
+        kfree(fnode);
+        return NULL;
     }
 
     fnode->open = ext2fs_open;
@@ -776,8 +789,7 @@ static ssize_t ext2fs_read(fs_node_t *node, off_t off, size_t sz, uint8_t *buf) 
 
 static ssize_t ext2fs_write(fs_node_t *node, off_t off, size_t sz, uint8_t *buf) {
     ext2_fs_t *fs = node->device;
-    /* if not mounted as writable, return -1 */
-    if(!(fs->flags & EXT2_FLAG_RW)) return -1;
+    if(!(fs->flags & EXT2_FLAG_RW)) return -EROFS;
 
     ext2_inode_t *ino = read_inode(fs, node->inode);
 
@@ -829,7 +841,7 @@ static struct dirent *ext2fs_readdir(fs_node_t *node, off_t idx) {
     return NULL;
 }
 
-static fs_node_t *ext2fs_finddir(fs_node_t *node, char *name) {
+static fs_node_t *ext2fs_finddir(fs_node_t *node, const char *name) {
     ext2_fs_t *fs = node->device;
     ext2_inode_t *ino = read_inode(fs, node->inode);
 
@@ -913,24 +925,11 @@ static int ext2fs_root(ext2_fs_t *fs, ext2_inode_t *ino, fs_node_t *fnode) {
     fnode->links_count = ino->i_links_count;
 
     /* flags */
-    fnode->flags = 0;
-    if((ino->i_mode & EXT2_TYPE_REG) == EXT2_TYPE_REG) {
-        DPRINTF(CRITICAL, "root inode is a regular file!");
-        return 1;
-    }
-    if((ino->i_mode & EXT2_TYPE_DIR) != EXT2_TYPE_DIR) {
+    if((ino->i_mode & EXT2_TYPE_MASK) != EXT2_TYPE_DIR) {
         DPRINTF(CRITICAL, "root inode is not a directory!");
         return 1;
     }
-    if((ino->i_mode & EXT2_TYPE_BLOCK) == EXT2_TYPE_BLOCK)
-        fnode->flags |= FS_TYPE_BLOCK;
-    if((ino->i_mode & EXT2_TYPE_CHAR) == EXT2_TYPE_CHAR)
-        fnode->flags |= FS_TYPE_CHAR;
-    if((ino->i_mode & EXT2_TYPE_FIFO) == EXT2_TYPE_FIFO)
-        fnode->flags |= FS_TYPE_PIPE;
-    if((ino->i_mode & EXT2_TYPE_LINK) == EXT2_TYPE_LINK)
-        fnode->flags |= FS_TYPE_LINK;
-    fnode->flags |= FS_TYPE_DIR | FS_FLAG_MOUNT;
+    fnode->flags = FS_FLAG_IFDIR | FS_FLAG_MOUNT;
 
     fnode->read = NULL;
     fnode->write = NULL;
@@ -974,10 +973,10 @@ static fs_node_t *ext2fs_mount(const char *arg, const char *mountpoint) {
     DPRINTF(INFO, "mounting at %s with args %s\n", mountpoint, arg);
 
     /* load superblock */
-    ext2_superblock_t *sb = kmalloc(sizeof(ext2_superblock_t));
-    fs->sb = sb;
     /* temporary block size to read superblock correctly */
     fs->block_sz = 1024;
+    ext2_superblock_t *sb = kmalloc(fs->block_sz);
+    fs->sb = sb;
     read_block(fs, 1, (uint8_t *)sb);
     if(sb->s_magic != EXT2_MAGIC) {
         DPRINTF(ERROR, "not an EXT2 filesystem\n");

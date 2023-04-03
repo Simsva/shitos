@@ -34,6 +34,7 @@
 #define EXT2_FEATURE_ROCOMPAT_BTREE_DIR    0x0004
 
 /* inode */
+#define EXT2_TYPE_MASK  0xf000
 #define EXT2_TYPE_FIFO  0x1000
 #define EXT2_TYPE_CHAR  0x2000
 #define EXT2_TYPE_DIR   0x4000

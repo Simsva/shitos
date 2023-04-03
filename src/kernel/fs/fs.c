@@ -2,9 +2,12 @@
 
 #include <kernel/hashmap.h>
 #include <kernel/kmem.h>
+#include <sys/stat.h>
 #include <features.h>
 #include <fcntl.h>
+#include <stdio.h>
 #include <string.h>
+#include <errno.h>
 
 #define MAX_SYMLINK_DEPTH 8
 #define MAX_SYMLINK_SIZE 0x1000
@@ -17,46 +20,313 @@
 tree_t *fs_tree = NULL;
 static hashmap_t *fs_types = NULL;
 
-ssize_t fs_read(struct fs_node *node, off_t off, size_t sz, uint8_t *buf) {
-    if(!node) return -1;
+static void get_canon_parent_basename(const char *cwd, const char *path, size_t *pathsz, char **canon, char **parent, char **basename);
+
+/**
+ * Write the canonicalized path to canon, parent directory to parent, and the
+ * basename to basename. Canon and parent are freed by the caller, basename is
+ * simply an offset in canon.
+ * If path is the root directory, sets parent and basename to NULL.
+ *
+ * XXX: does no any sanity checks at all on path
+ */
+static void get_canon_parent_basename(const char *cwd, const char *path, size_t *pathsz, char **canon, char **parent, char **basename) {
+    char *b;
+    *canon = canonicalize_path(cwd, path, pathsz);
+
+    if(*pathsz < 2) {
+        /* path is "/" */
+        *parent = *basename = NULL;
+        return;
+    }
+
+    for(b = *canon + *pathsz-1; *b != PATH_SEPARATOR; b--);
+    if(*canon == b) {
+        /* if first PATH_SEPARATOR was the "root slash" */
+        *parent = strdup("/");
+        *basename = b+1;
+    } else {
+        /* memcpy parent part of the path */
+        size_t parentsz = b - *canon;
+        *parent = kmalloc(parentsz + 1);
+        memcpy(*parent, *canon, parentsz);
+        (*parent)[parentsz] = '\0';
+
+        *basename = b+1;
+    }
+}
+
+ssize_t fs_read(fs_node_t *node, off_t off, size_t sz, uint8_t *buf) {
+    if(!node) return -ENOENT;
     if(node->read) return node->read(node, off, sz, buf);
-    else return -1;
+    else return -EINVAL;
 }
 
-ssize_t fs_write(struct fs_node *node, off_t off, size_t sz, uint8_t *buf) {
-    if(!node) return -1;
+ssize_t fs_write(fs_node_t *node, off_t off, size_t sz, uint8_t *buf) {
+    if(!node) return -ENOENT;
     if(node->write) return node->write(node, off, sz, buf);
-    else return -1;
+    else return -EINVAL;
 }
 
-void fs_open(struct fs_node *node, unsigned flags) {
+void fs_open(fs_node_t *node, unsigned flags) {
     if(!node) return;
+    if(node->refcount >= 0) node->refcount++;
     if(node->open) node->open(node, flags);
 }
 
-void fs_close(struct fs_node *node) {
+void fs_close(fs_node_t *node) {
     if(!node) return;
+    /* never close files with negative refcounts */
+    if(node->refcount < 0) return;
+
+    /* decrement refcount, if zero free file */
+    if(--node->refcount != 0) return;
+
     if(node->close) node->close(node);
+    kfree(node);
 }
 
-struct dirent *fs_readdir(struct fs_node *node, off_t idx) {
+struct dirent *fs_readdir(fs_node_t *node, off_t idx) {
     if(!node) return NULL;
-    if(node->readdir && node->flags & FS_TYPE_DIR)
+    if(node->readdir && FS_ISDIR(node->flags))
         return node->readdir(node, idx);
     else return NULL;
 }
 
-fs_node_t *fs_finddir(fs_node_t *node, char *name) {
+fs_node_t *fs_finddir(fs_node_t *node, const char *name) {
     if(!node) return NULL;
-    if(node->finddir && node->flags & FS_TYPE_DIR)
+    if(node->finddir && FS_ISDIR(node->flags))
         return node->finddir(node, name);
     else return NULL;
 }
 
 int fs_readlink(fs_node_t *node, char *buf, size_t sz) {
-    if(!node) return -1;
+    if(!node) return -ENOENT;
     if(node->readlink) return node->readlink(node, buf, sz);
-    else return -1;
+    else return -EINVAL;
+}
+
+int fs_truncate(fs_node_t *node, size_t sz) {
+    if(!node) return -ENOENT;
+    if(node->truncate) return node->truncate(node, sz);
+    else return -EINVAL;
+}
+
+int fs_mknod(const char *path, mode_t mode) {
+    if(!path) return -EFAULT;
+    if(!path[0]) return -ENOENT;
+    if(!(mode & S_IFMT)) return -EINVAL;
+
+    size_t pathsz;
+    char *cpath, *basename, *parent;
+    int ret = 0;
+
+    get_canon_parent_basename("/", path, &pathsz, &cpath, &parent, &basename);
+
+    if(!parent || !basename) {
+        /* root directory */
+        kfree(cpath);
+        return -EEXIST;
+    }
+
+    /* test if path already exists */
+    fs_node_t *tmp = kopen(cpath, 0);
+    if(tmp) {
+        fs_close(tmp);
+        ret = -EEXIST;
+        goto ret_free;
+    }
+
+    fs_node_t *fparent = kopen(parent, 0);
+    if(!fparent) {
+        ret = -ENOENT;
+        goto ret_free;
+    }
+    if(!FS_ISDIR(fparent->flags)) {
+        ret = -ENOTDIR;
+        fs_close(fparent);
+        goto ret_free;
+    }
+
+    /* TODO: check permissions? */
+
+    ret = fparent->mknod
+        ? fparent->mknod(fparent, basename, mode)
+        : -EROFS;
+    fs_close(fparent);
+
+ret_free:
+    kfree(cpath);
+    kfree(parent);
+    return ret;
+}
+
+int fs_unlink(const char *path) {
+    if(!path) return -EFAULT;
+    if(!path[0]) return -ENOENT;
+
+    size_t pathsz;
+    char *cpath, *basename, *parent;
+    int ret = 0;
+
+    get_canon_parent_basename("/", path, &pathsz, &cpath, &parent, &basename);
+
+    if(!parent || !basename) {
+        /* root directory */
+        kfree(cpath);
+        return -EBUSY;
+    }
+
+    /* test if path actually exists */
+    fs_node_t *tmp = kopen(cpath, 0);
+    if(!tmp) {
+        ret = -ENOENT;
+        goto ret_free;
+    }
+    fs_close(tmp);
+
+    fs_node_t *fparent = kopen(parent, 0);
+    if(!fparent) {
+        ret = -ENOENT;
+        goto ret_free;
+    }
+    if(!FS_ISDIR(fparent->flags)) {
+        ret = -ENOTDIR;
+        fs_close(fparent);
+        goto ret_free;
+    }
+
+    /* TODO: check permissions? */
+
+    ret = fparent->unlink
+        ? fparent->unlink(fparent, basename)
+        : -EROFS;
+    fs_close(fparent);
+
+ret_free:
+    kfree(cpath);
+    kfree(parent);
+    return ret;
+}
+
+int fs_link(const char *oldpath, const char *newpath) {
+    if(!oldpath || !newpath) return -EFAULT;
+    if(!oldpath[0] || !newpath[0]) return -ENOENT;
+
+    size_t pathsz;
+    char *cpath, *basename, *parent;
+    int ret = 0;
+
+    /* follow symlinks in oldpath */
+    fs_node_t *old = kopen(oldpath, 0);
+    if(!old) return -ENOENT;
+    if(FS_ISDIR(old->flags)) return -EPERM;
+
+    get_canon_parent_basename("/", newpath, &pathsz, &cpath, &parent, &basename);
+
+    if(!parent || !basename) {
+        /* root directory */
+        kfree(cpath);
+        return -EBUSY;
+    }
+
+    /* test if path already exists */
+    fs_node_t *tmp = kopen(cpath, 0);
+    if(tmp) {
+        ret = -EEXIST;
+        fs_close(tmp);
+        goto ret_free;
+    }
+
+    fs_node_t *fparent = kopen(parent, 0);
+    if(!fparent) {
+        ret = -ENOENT;
+        goto ret_free;
+    }
+    if(!FS_ISDIR(fparent->flags)) {
+        ret = -ENOTDIR;
+        fs_close(fparent);
+        goto ret_free;
+    }
+
+    /* TODO: check permissions? */
+
+    ret = fparent->link
+        ? fparent->link(fparent, basename, old)
+        : -EROFS;
+    fs_close(fparent);
+
+ret_free:
+    fs_close(old);
+    kfree(cpath);
+    kfree(parent);
+    return ret;
+}
+
+int fs_symlink(const char *target, const char *path) {
+    if(!target || !path) return -EFAULT;
+    if(!target[0] || !path[0]) return -ENOENT;
+
+    size_t pathsz;
+    char *cpath, *basename, *parent;
+    int ret = 0;
+
+    get_canon_parent_basename("/", path, &pathsz, &cpath, &parent, &basename);
+
+    if(!parent || !basename) {
+        /* root directory */
+        kfree(cpath);
+        return -EBUSY;
+    }
+
+    /* test if path already exists */
+    fs_node_t *tmp = kopen(cpath, 0);
+    if(tmp) {
+        ret = -EEXIST;
+        fs_close(tmp);
+        goto ret_free;
+    }
+
+    fs_node_t *fparent = kopen(parent, 0);
+    if(!fparent) {
+        ret = -ENOENT;
+        goto ret_free;
+    }
+    if(!FS_ISDIR(fparent->flags)) {
+        ret = -ENOTDIR;
+        fs_close(fparent);
+        goto ret_free;
+    }
+
+    /* TODO: check permissions? */
+
+    ret = fparent->symlink
+        ? fparent->symlink(fparent, basename, target)
+        : -EROFS;
+    fs_close(fparent);
+
+ret_free:
+    kfree(cpath);
+    kfree(parent);
+    return ret;
+}
+
+int fs_chmod(fs_node_t *node, mode_t mode) {
+    if(!node) return -ENOENT;
+    if(node->chmod) return node->chmod(node, mode);
+    return -EROFS;
+}
+
+int fs_chown(fs_node_t *node, uid_t uid, gid_t gid) {
+    if(!node) return -ENOENT;
+    if(node->chown) return node->chown(node, uid, gid);
+    return -EROFS;
+}
+
+int fs_ioctl(fs_node_t *node, unsigned long request, void *argp) {
+    if(!node) return -ENOENT;
+    if(node->ioctl) return node->ioctl(node, request, argp);
+    return -EINVAL;
 }
 
 void vfs_install(void) {
@@ -116,7 +386,7 @@ static fs_node_t *vfs_mapper(void) {
     memset(fnode, 0, sizeof(fs_node_t));
     strcpy(fnode->name, "mapped");
     fnode->mask = 0555;
-    fnode->flags = FS_TYPE_DIR;
+    fnode->flags = FS_FLAG_IFDIR;
     fnode->readdir = mapper_readdir;
     return fnode;
 }
@@ -129,11 +399,11 @@ int vfs_register_type(const char *type, vfs_mount_t mount) {
 
 void *vfs_mount(const char *path, fs_node_t *local_root) {
     if(!fs_tree) {
-        /* TODO: kerror */
+        errno = ENOENT;
         return NULL;
     }
     if(!path || path[0] != PATH_SEPARATOR) {
-        /* TODO: kerror */
+        errno = EINVAL;
         return NULL;
     }
 
@@ -154,9 +424,10 @@ void *vfs_mount(const char *path, fs_node_t *local_root) {
     if(*head == '\0') {
         /* setting the root node */
         struct vfs_entry *root = (struct vfs_entry *)root_node->value;
-        /* if(root->file) { */
+        if(root->file) {
             /* TODO: kerror warning already mounted */
-        /* } */
+            printf("WARN: root is already mounted, remounting\n");
+        }
         root->file = local_root;
         retval = root_node;
     } else {
@@ -189,9 +460,10 @@ void *vfs_mount(const char *path, fs_node_t *local_root) {
         }
 
         struct vfs_entry *entry = (struct vfs_entry *)node->value;
-        /* if(entry->file) { */
+        if(entry->file) {
             /* TODO: kerror warning already mounted */
-        /* } */
+            printf("WARN: %s is already mounted, remounting\n", path);
+        }
         entry->file = local_root;
         retval = node;
     }
@@ -204,15 +476,14 @@ int vfs_mount_type(const char *type, const char *arg, const char *mountpoint) {
     vfs_mount_t mount = hashmap_get(fs_types, type);
     if(!mount) {
         /* Unknown filesystem */
-        /* TODO: ENODEV */
-        return -1;
+        return -ENODEV;
     }
 
     fs_node_t *node = mount(arg, mountpoint);
 
     /* HACK: let partition mappers not return a node to mount */
     if((uintptr_t)node == 1) return 0;
-    if(!node) return -1; /* TODO: EINVAL */
+    if(!node) return -EINVAL;
 
     tree_node_t *tnode = vfs_mount(mountpoint, node);
     if(tnode && tnode->value) {
@@ -352,7 +623,10 @@ static fs_node_t *get_mount_point(char *path, size_t path_depth, char **outpath,
 
 /* assumes root is mounted, can dereference a NULL pointer otherwise */
 static fs_node_t *kopen_recur(const char *file, unsigned flags, unsigned symlink_depth, const char *cwd) {
-    if(!file) return NULL;
+    if(!file) {
+        errno = EINVAL;
+        return NULL;
+    }
 
     size_t path_sz;
     char *path = canonicalize_path(cwd, file, &path_sz);
@@ -387,7 +661,10 @@ static fs_node_t *kopen_recur(const char *file, unsigned flags, unsigned symlink
      * either the file we are looking for, a symlink, or a mount point */
     fs_node_t *node = get_mount_point(path, path_depth, &path_head, &depth);
 
-    if(!node) return NULL;
+    if(!node) {
+        errno = ENOENT;
+        return NULL;
+    }
 
     do {
         /*
@@ -395,17 +672,17 @@ static fs_node_t *kopen_recur(const char *file, unsigned flags, unsigned symlink
          * O_PATH are set. However, if they are set we should not follow a
          * symlink if it is the "leaf" of the path.
          */
-         if(node->flags & FS_TYPE_LINK &&
+         if(FS_ISLNK(node->flags) &&
             !((flags & O_NOFOLLOW) && (flags & O_PATH) && depth == path_depth)) {
              if((flags & O_NOFOLLOW) && depth == path_depth - 1) {
-                 /* TODO: ELOOP */
                  /* do not follow the final entry with O_NOFOLLOW */
+                 errno = ELOOP;
                  kfree(path);
                  kfree(node);
                  return NULL;
              }
              if(symlink_depth >= MAX_SYMLINK_DEPTH) {
-                 /* TODO: ELOOP */
+                 errno = ELOOP;
                  kfree(path);
                  kfree(node);
                  return NULL;
@@ -416,13 +693,13 @@ static fs_node_t *kopen_recur(const char *file, unsigned flags, unsigned symlink
              char symlink_buf[MAX_SYMLINK_SIZE];
              int len = fs_readlink(node, symlink_buf, sizeof symlink_buf);
              if(len < 0) {
-                 /* TODO: errno */
+                 errno = -len;
                  kfree(path);
                  kfree(node);
                  return NULL;
              }
              if(symlink_buf[len] != '\0') {
-                 /* TODO: errno */
+                 errno = ENAMETOOLONG; /* feels weird */
                  kfree(path);
                  kfree(node);
                  return NULL;
@@ -443,7 +720,7 @@ static fs_node_t *kopen_recur(const char *file, unsigned flags, unsigned symlink
              kfree(relpath);
 
              if(!node) {
-                 /* failed to follow symlink, dangling symlink? */
+                 errno = ENOENT;
                  kfree(path);
                  return NULL;
              }
@@ -462,6 +739,7 @@ static fs_node_t *kopen_recur(const char *file, unsigned flags, unsigned symlink
          node = node_next;
 
          if(!node) {
+             errno = ENOENT;
              kfree(path);
              return NULL;
          }
@@ -470,6 +748,7 @@ static fs_node_t *kopen_recur(const char *file, unsigned flags, unsigned symlink
     } while(depth < path_depth + 1);
 
     /* failed to find the requested file */
+    errno = ENOENT;
     kfree(path);
     return NULL;
 }

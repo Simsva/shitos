@@ -124,9 +124,7 @@ _BEGIN_C_HEADER
 #define EOWNERDEAD 142        /* Previous owner died */
 #define ESTRPIPE 143          /* Streams pipe error */
 
-#ifdef __is_libc
 extern int errno;
-#endif
 
 _END_C_HEADER
 

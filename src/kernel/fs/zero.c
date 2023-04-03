@@ -28,7 +28,7 @@ static fs_node_t *null_dev_create(void) {
     fnode->uid = 0;
     fnode->gid = 0;
     fnode->mask = 0666;
-    fnode->flags = FS_TYPE_CHAR;
+    fnode->flags = FS_FLAG_IFCHR;
     fnode->read = null_read;
     fnode->write = null_write;
     return fnode;
@@ -42,7 +42,7 @@ static fs_node_t *zero_dev_create(void) {
     fnode->uid = 0;
     fnode->gid = 0;
     fnode->mask = 0666;
-    fnode->flags = FS_TYPE_CHAR;
+    fnode->flags = FS_FLAG_IFCHR;
     fnode->read = zero_read;
     fnode->write = zero_write;
     return fnode;

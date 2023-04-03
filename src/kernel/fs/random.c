@@ -31,7 +31,7 @@ static fs_node_t *random_dev_create(void) {
     node->gid = 0;
     node->mask = 0444;
     node->sz = 1024;
-    node->flags = FS_TYPE_CHAR;
+    node->flags = FS_FLAG_IFCHR;
     node->read = random_read;
     return node;
 }

@@ -58,13 +58,13 @@ static fs_node_t *dospart_device_create(uint8_t i, fs_node_t *dev, mbr_t *mbr) {
 
     fs_node_t *fnode = kmalloc(sizeof(fs_node_t));
     memset(fnode, 0, sizeof(fs_node_t));
-    snprintf(fnode->name, sizeof fnode->name, "dospart%d", i);
+    snprintf(fnode->name, sizeof fnode->name, "dospart%d", i+1);
     fnode->device = ddev;
     fnode->uid = 0;
     fnode->gid = 0;
     fnode->mask = 0660;
     fnode->sz = ddev->part.num_sectors * SECTORSZ;
-    fnode->flags = FS_TYPE_BLOCK;
+    fnode->flags = FS_FLAG_IFBLK;
 
     fnode->read = dospart_read;
     fnode->write = dospart_write;
@@ -85,7 +85,7 @@ static fs_node_t *dospart_map(const char *arg, __unused const char *mountpoint) 
 
         fs_node_t *fnode = dospart_device_create(i, dev, &mbr);
         char devname[64];
-        snprintf(devname, sizeof devname, "%s%d", arg, i);
+        snprintf(devname, sizeof devname, "%s%d", arg, i+1);
         vfs_mount(devname, fnode);
     }
 

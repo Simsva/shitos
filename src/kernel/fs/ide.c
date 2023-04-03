@@ -262,7 +262,7 @@ static fs_node_t *ata_device_create(ata_device_t *dev, char drive_char) {
     fnode->uid = 0;
     fnode->gid = 0;
     fnode->mask = 0660;
-    fnode->flags = FS_TYPE_BLOCK;
+    fnode->flags = FS_FLAG_IFBLK;
 
     fnode->read = ata_read;
     fnode->write = ata_write;
