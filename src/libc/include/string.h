@@ -27,6 +27,10 @@ char *strtok_r(char *__restrict, const char *__restrict, char **__restrict);
 
 char *strchrnul(const char *, int);
 
+#ifndef __is_libk
+char *strerror(int);
+#endif
+
 _END_C_HEADER
 
 #endif // STRING_H_
