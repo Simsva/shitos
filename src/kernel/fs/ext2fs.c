@@ -8,8 +8,9 @@
 #include <kernel/args.h>
 #include <stdio.h>
 #include <string.h>
+#include <strings.h>
 
-#define DPRINTF(lvl, fmt, ...)if(fs->flags & EXT2_FLAG_VERBOSE) { \
+#define DPRINTF(lvl, fmt, ...) if(fs->flags & EXT2_FLAG_VERBOSE) { \
     printf("ext2fs [%s]: " fmt, #lvl __VA_OPT__(,) __VA_ARGS__); }
 
 #define E_SUCCESS  0
@@ -88,8 +89,11 @@ static int read_block_inode(ext2_fs_t *fs, ext2_inode_t *ino, uint32_t off, uint
     if(off >= get_content_blocks(fs, ino->i_blocks)) {
         /* NOTE: memset to 0 so writing out of bounds works correctly */
         memset(buf, 0, fs->block_sz);
-        DPRINTF(WARN, "tried to read block %u in an inode with %u blocks (including indirect blocks)\n",
-                off+1, ino->i_blocks / (fs->block_sz / 512));
+
+        /* this warning will trigger everytime a block is allocated
+         * TODO: better implementation */
+        /* DPRINTF(WARN, "tried to read block %u in an inode with %u blocks (including indirect blocks)\n", */
+        /*         off+1, ino->i_blocks / (fs->block_sz / 512)); */
         return E_BADBLOCK;
     }
 
@@ -114,7 +118,7 @@ static int write_block_inode(ext2_fs_t *fs, ext2_inode_t *ino, uint32_t ino_no, 
  * pretty much exactly like ata_read in the IDE driver.
  */
 static ssize_t read_buffer_inode(ext2_fs_t *fs, ext2_inode_t *ino, off_t off, size_t sz, uint8_t *buf) {
-    /* TODO: error handling  */
+    /* TODO: error handling */
     if((size_t)off > ino->i_size) return 0;
     if((size_t)off + sz > ino->i_size)
         sz = ino->i_size - off;
@@ -296,16 +300,72 @@ static int write_inode(ext2_fs_t *fs, ext2_inode_t *ino, uint32_t ino_no) {
     return E_SUCCESS;
 }
 
-/* TODO: zero out blocks on allocation */
-static uint32_t alloc_block(ext2_fs_t *fs);
+/**
+ * alloc_block will allocate a free EXT2 block on disk, zero it out, and return
+ * its index.
+ * Returns zero on error.
+ */
+static uint32_t alloc_block(ext2_fs_t *fs) {
+    uint32_t blockno, blocki, blockoff, bg;
+    uint32_t *buf = kmalloc(fs->block_sz);
 
+    for(bg = 0, blockno = 0; bg < fs->bgdt_sz; bg++) {
+        if(fs->bgdt[bg].bg_free_blocks_count == 0) continue;
+
+        read_block(fs, fs->bgdt[bg].bg_block_bitmap, (uint8_t *)buf);
+        for(blocki = 0; blocki < fs->block_sz / sizeof(uint32_t); blocki++) {
+            if((blockoff = ffsl(~buf[blocki]))) {
+                /* found bit offset + block index + block group index */
+                blockno = blockoff-1 + 32*blocki + bg*fs->sb->s_blocks_per_group;
+                goto found;
+            }
+        }
+    }
+found:
+    if(!blockno) {
+        DPRINTF(CRITICAL, "no free blocks left\n");
+        kfree(buf);
+        return 0;
+    }
+
+    buf[blocki] |= 1 << (blockoff-1);
+    write_block(fs, fs->bgdt[bg].bg_block_bitmap, (uint8_t *)buf);
+
+    /* update the BGDT */
+    fs->bgdt[bg].bg_free_blocks_count--;
+    for(uint32_t i = 0; i < fs->bgdt_block_sz; i++)
+        write_block(fs, fs->bgdt_off + i, (void *)fs->bgdt + fs->block_sz*i);
+
+    /* update the superblock */
+    fs->sb->s_free_blocks_count--;
+    write_superblock(fs);
+
+    /* zero out found block */
+    memset(buf, 0, fs->block_sz);
+    write_block(fs, blockno, (uint8_t *)buf);
+
+    kfree(buf);
+    return blockno;
+}
+
+/**
+ * alloc_inode_block allocates a block at the specified offset in the inode.
+ *
+ * BUG: if an indirect block doesn't exist, it will allocate the first "content"
+ * block first, thus making consecutively allocated "content" blocks
+ * noncontiguous even if it would be possible for them to be contiguous.
+ */
 static int alloc_inode_block(ext2_fs_t *fs, ext2_inode_t *ino, uint32_t ino_no, uint32_t block) {
     uint32_t real_block = alloc_block(fs);
     if(!real_block) return E_NOSPACE;
 
-    set_real_block(fs, ino, ino_no, block, real_block);
+    uint32_t err;
+    if((err = set_real_block(fs, ino, ino_no, block, real_block)) != E_SUCCESS)
+        return err;
 
-    uint32_t sectors = (0);
+    uint32_t sectors = get_block_count(fs, block+1);
+    if(ino->i_blocks < sectors) ino->i_blocks = sectors;
+    return write_inode(fs, ino, ino_no);
 }
 
 /**
@@ -365,9 +425,9 @@ static uint32_t get_real_block(ext2_fs_t *fs, ext2_inode_t *ino, uint32_t off) {
 
         kfree(tmp);
         return intermediate;
-    } else if(off < EXT2_NDIR_BLOCKS + p + p*p + p*p*p) {
+    } else { /*if(off < EXT2_NDIR_BLOCKS + p + p*p + p*p*p) {*/
         /* triply indirect block */
-        /* XXX: this check will overflow on large block sizes */
+        /* XXX: this also happens on too high block numbers */
 
         if(!ino->i_block[EXT2_TIND_BLOCK]) {
             DPRINTF(ERROR, "trying to read a non-existant TIND block\n");
@@ -404,11 +464,140 @@ static uint32_t get_real_block(ext2_fs_t *fs, ext2_inode_t *ino, uint32_t off) {
         return intermediate;
     }
 
+    /* XXX: unreachable, TODO: add OOB check */
     DPRINTF(ERROR, "trying to read a block number higher than the maximum\n");
     return 0;
 }
 
-static int set_real_block(ext2_fs_t *fs, ext2_inode_t *ino, uint32_t ino_no, uint32_t ino_block, uint32_t real_block);
+/**
+ * set_real_block assigns real_block to the block at offset ino_block in an inode.
+ */
+static int set_real_block(ext2_fs_t *fs, ext2_inode_t *ino, uint32_t ino_no, uint32_t ino_block, uint32_t real_block) {
+    /* pointers per block */
+    uint32_t p = fs->block_sz / sizeof(uint32_t);
+
+    /* indirect block storage */
+    uint32_t *tmp;
+    /* indirect block math */
+    uint32_t a, idx1, idx2, idx3;
+    /* intermediate block */
+    uint32_t intermediate;
+    int ret;
+
+    if(ino_block < EXT2_NDIR_BLOCKS) {
+        /* direct block */
+        ino->i_block[ino_block] = real_block;
+        return write_inode(fs, ino, ino_no);
+    } else if(ino_block < EXT2_NDIR_BLOCKS + p) {
+        /* singly indirect block */
+        if(!ino->i_block[EXT2_SIND_BLOCK]) {
+            uint32_t new_block = alloc_block(fs);
+            if(!new_block) return E_NOSPACE;
+            ino->i_block[EXT2_SIND_BLOCK] = new_block;
+            write_inode(fs, ino, ino_no);
+        }
+
+        idx1 = ino_block - EXT2_NDIR_BLOCKS;
+
+        tmp = kmalloc(fs->block_sz);
+        read_block(fs, ino->i_block[EXT2_SIND_BLOCK], (uint8_t *)tmp);
+        tmp[idx1] = real_block;
+        ret = write_block(fs, ino->i_block[EXT2_SIND_BLOCK], (uint8_t *)tmp);
+
+        goto ret_free;
+    } else if(ino_block < EXT2_NDIR_BLOCKS + p + p*p) {
+        /* doubly indirect block */
+        if(!ino->i_block[EXT2_DIND_BLOCK]) {
+            uint32_t new_block = alloc_block(fs);
+            if(!new_block) return E_NOSPACE;
+            ino->i_block[EXT2_DIND_BLOCK] = new_block;
+            write_inode(fs, ino, ino_no);
+        }
+
+        a = ino_block - EXT2_NDIR_BLOCKS - p;
+        idx1 = a / p;
+        idx2 = a % p;
+
+        tmp = kmalloc(fs->block_sz);
+        read_block(fs, ino->i_block[EXT2_DIND_BLOCK], (uint8_t *)tmp);
+        if(!tmp[idx1]) {
+            uint32_t new_block = alloc_block(fs);
+            if(!new_block){
+                ret = E_NOSPACE;
+                goto ret_free;
+            }
+            tmp[idx1] = new_block;
+            /* write the DIND */
+            if((ret = write_block(fs, ino->i_block[EXT2_DIND_BLOCK], (uint8_t *)tmp)) != E_SUCCESS)
+                goto ret_free;
+        }
+
+        intermediate = tmp[idx1];
+        read_block(fs, intermediate, (uint8_t *)tmp);
+        tmp[idx2] = real_block;
+        ret = write_block(fs, intermediate, (uint8_t *)tmp);
+
+        goto ret_free;
+    } else { /*if(ino_block < EXT2_NDIR_BLOCKS + p + p*p + p*p*p) {*/
+        /* triply indirect block */
+        /* XXX: this also happens on too high block numbers */
+
+        if(!ino->i_block[EXT2_TIND_BLOCK]) {
+            uint32_t new_block = alloc_block(fs);
+            if(!new_block) return E_NOSPACE;
+            ino->i_block[EXT2_TIND_BLOCK] = new_block;
+            write_inode(fs, ino, ino_no);
+        }
+
+        a = ino_block - EXT2_NDIR_BLOCKS - p - p*p;
+        idx1 = a / (p*p);
+        a %= (p*p);
+        idx2 = a / p;
+        idx3 = a % p;
+
+        tmp = kmalloc(fs->block_sz);
+        read_block(fs, ino->i_block[EXT2_TIND_BLOCK], (uint8_t *)tmp);
+        if(!tmp[idx1]) {
+            uint32_t new_block = alloc_block(fs);
+            if(!new_block){
+                ret = E_NOSPACE;
+                goto ret_free;
+            }
+            tmp[idx1] = new_block;
+            /* write the TIND */
+            if((ret = write_block(fs, ino->i_block[EXT2_TIND_BLOCK], (uint8_t *)tmp)) != E_SUCCESS)
+                goto ret_free;
+        }
+
+        intermediate = tmp[idx1];
+        read_block(fs, intermediate, (uint8_t *)tmp);
+        if(!tmp[idx2]) {
+            uint32_t new_block = alloc_block(fs);
+            if(!new_block){
+                ret = E_NOSPACE;
+                goto ret_free;
+            }
+            tmp[idx2] = new_block;
+            /* write the intermediate DIND */
+            if((ret = write_block(fs, intermediate, (uint8_t *)tmp)) != E_SUCCESS)
+                goto ret_free;
+        }
+
+        intermediate = tmp[idx2];
+        read_block(fs, intermediate, (uint8_t *)tmp);
+        tmp[idx3] = real_block;
+        ret = write_block(fs, intermediate, (uint8_t *)tmp);
+
+        goto ret_free;
+    }
+
+    /* XXX: unreachable, TODO: add OOB check */
+    DPRINTF(ERROR, "trying to read a block number higher than the maximum\n");
+    return E_BADBLOCK;
+ret_free:
+    kfree(tmp);
+    return ret;
+}
 
 /**
  * get_block_count returns the amount of used disk sectors of an inode with the
@@ -465,7 +654,7 @@ static uint32_t get_content_blocks(ext2_fs_t *fs, uint32_t sectors) {
     uint32_t p = fs->block_sz / sizeof(uint32_t);
     uint32_t a, ind_blocks;
 
-    /* NOTE: this entire function is pure magic, don't ask */
+    /* this entire function is pure magic, don't ask */
     if(blocks <= EXT2_NDIR_BLOCKS) {
         /* direct blocks only */
         ind_blocks = 0;
@@ -612,7 +801,7 @@ static struct dirent *ext2fs_readdir(fs_node_t *node, off_t idx) {
     uint32_t blockno = 0, offset = 0;
     off_t curidx = 0;
     uint8_t *buf = kmalloc(fs->block_sz);
-    read_block(fs, get_real_block(fs, ino, blockno), buf);
+    read_block_inode(fs, ino, blockno, buf);
     ext2_dir_entry_t *dirent = (void *)buf;
 
     while(offset < node->sz && curidx <= idx) {
@@ -632,7 +821,7 @@ static struct dirent *ext2fs_readdir(fs_node_t *node, off_t idx) {
 
         if((uintptr_t)dirent - (uintptr_t)buf >= fs->block_sz) {
             dirent = (void *)dirent - fs->block_sz;
-            read_block(fs, get_real_block(fs, ino, ++blockno), buf);
+            read_block_inode(fs, ino, ++blockno, buf);
         }
     }
     kfree(ino);
@@ -647,7 +836,7 @@ static fs_node_t *ext2fs_finddir(fs_node_t *node, char *name) {
     char namebuf[256];
     uint32_t blockno = 0, offset = 0;
     uint8_t *buf = kmalloc(fs->block_sz);
-    read_block(fs, get_real_block(fs, ino, blockno), buf);
+    read_block_inode(fs, ino, blockno, buf);
     ext2_dir_entry_t *dirent = (void *)buf;
     int found = 0;
     size_t name_len = strlen(name);
@@ -669,7 +858,7 @@ static fs_node_t *ext2fs_finddir(fs_node_t *node, char *name) {
 
         if((uintptr_t)dirent - (uintptr_t)buf >= fs->block_sz) {
             dirent = (void *)dirent - fs->block_sz;
-            read_block(fs, get_real_block(fs, ino, ++blockno), buf);
+            read_block_inode(fs, ino, ++blockno, buf);
         }
     }
     if(!found || dirent->inode == 0) {
@@ -695,7 +884,7 @@ static ssize_t ext2fs_readlink(fs_node_t *node, char *buf, size_t sz) {
     /* if the link fits inside the space used for block pointers it will be
      * stored there instead of in a block */
     if(ino->i_size > EXT2_N_BLOCKS * sizeof(uint32_t))
-        ext2fs_read(node, 0, read_sz, (uint8_t *)buf);
+        read_buffer_inode(fs, ino, 0, read_sz, (uint8_t *)buf);
     else
         memcpy(buf, (void *)ino->i_block, read_sz);
 
