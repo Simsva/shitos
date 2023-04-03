@@ -548,7 +548,7 @@ static ssize_t ata_write(fs_node_t *node, off_t off, size_t sz, uint8_t *buf) {
 
     /* if start is not on a block boundary
      * or if total size is less than one block */
-    if(off % ATA_BLOCK_SZ) {
+    if(off % ATA_BLOCK_SZ || sz < ATA_BLOCK_SZ) {
         size_t prefix_sz = ATA_BLOCK_SZ - (off % ATA_BLOCK_SZ);
         if(prefix_sz > sz) prefix_sz = sz;
 
