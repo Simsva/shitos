@@ -115,7 +115,15 @@ int fs_truncate(fs_node_t *node, size_t sz) {
 int fs_mknod(const char *path, mode_t mode) {
     if(!path) return -EFAULT;
     if(!path[0]) return -ENOENT;
-    if(!(mode & S_IFMT)) return -EINVAL;
+
+    /* make sure the type is valid */
+    /* links should be created with fs_symlink */
+    switch(mode & S_IFMT) {
+    case S_IFDIR: case S_IFCHR: case S_IFBLK:
+    case S_IFREG: case S_IFIFO: case S_IFSOCK:
+        break;
+    default: return -EINVAL;
+    }
 
     size_t pathsz;
     char *cpath, *basename, *parent;
@@ -127,6 +135,11 @@ int fs_mknod(const char *path, mode_t mode) {
         /* root directory */
         kfree(cpath);
         return -EEXIST;
+    }
+
+    if(strlen(basename) > 255) {
+        ret = -ENAMETOOLONG;
+        goto ret_free;
     }
 
     /* test if path already exists */
@@ -175,6 +188,11 @@ int fs_unlink(const char *path) {
         /* root directory */
         kfree(cpath);
         return -EBUSY;
+    }
+
+    if(strlen(basename) > 255) {
+        ret = -ENAMETOOLONG;
+        goto ret_free;
     }
 
     /* test if path actually exists */
@@ -230,6 +248,11 @@ int fs_link(const char *oldpath, const char *newpath) {
         return -EBUSY;
     }
 
+    if(strlen(basename) > 255) {
+        ret = -ENAMETOOLONG;
+        goto ret_free;
+    }
+
     /* test if path already exists */
     fs_node_t *tmp = kopen(cpath, 0);
     if(tmp) {
@@ -279,6 +302,11 @@ int fs_symlink(const char *target, const char *path) {
         return -EBUSY;
     }
 
+    if(strlen(basename) > 255) {
+        ret = -ENAMETOOLONG;
+        goto ret_free;
+    }
+
     /* test if path already exists */
     fs_node_t *tmp = kopen(cpath, 0);
     if(tmp) {
@@ -313,7 +341,7 @@ ret_free:
 
 int fs_chmod(fs_node_t *node, mode_t mode) {
     if(!node) return -ENOENT;
-    if(node->chmod) return node->chmod(node, mode);
+    if(node->chmod) return node->chmod(node, mode & 07777);
     return -EROFS;
 }
 

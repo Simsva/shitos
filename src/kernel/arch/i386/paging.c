@@ -40,7 +40,7 @@ uint32_t frame_test(uint32_t frame_addr) {
     return frames[index] & (1<<offset);
 }
 
-uint32_t frame_find_first() {
+uint32_t frame_find_first(void) {
     uint32_t i, x;
 
     /* NOTE: skips the first MiB as it contains a lot of reserved memory */

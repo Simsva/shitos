@@ -32,7 +32,13 @@ static int refresh_inode(ext2_fs_t *fs, ext2_inode_t *ino, uint32_t ino_no);
 static ext2_inode_t *read_inode(ext2_fs_t *fs, uint32_t ino);
 static int write_inode(ext2_fs_t *fs, ext2_inode_t *ino, uint32_t ino_no);
 static uint32_t alloc_block(ext2_fs_t *fs);
+static int free_block(ext2_fs_t *fs, uint32_t block);
+static uint32_t alloc_inode(ext2_fs_t *fs);
+static int free_inode(ext2_fs_t *fs, uint32_t ino_no);
 static int alloc_inode_block(ext2_fs_t *fs, ext2_inode_t *ino, uint32_t ino_no, uint32_t block);
+static int free_inode_block(ext2_fs_t *fs, ext2_inode_t *ino, uint32_t ino_no, uint32_t block);
+static int create_dirent(fs_node_t *parent, uint32_t ino_no, const char *name, uint8_t type);
+static int create_dirent2(ext2_fs_t *fs, ext2_inode_t *pino, uint32_t pino_no, uint32_t ino_no, const char *name, uint8_t type);
 static uint32_t get_real_block(ext2_fs_t *fs, ext2_inode_t *ino, uint32_t block);
 static int set_real_block(ext2_fs_t *fs, ext2_inode_t *ino, uint32_t ino_no, uint32_t ino_block, uint32_t real_block);
 static uint32_t get_block_count(ext2_fs_t *fs, uint32_t blocks);
@@ -47,6 +53,13 @@ static void ext2fs_close(fs_node_t *node);
 static struct dirent *ext2fs_readdir(fs_node_t *node, off_t idx);
 static fs_node_t *ext2fs_finddir(fs_node_t *node, const char *name);
 static ssize_t ext2fs_readlink(fs_node_t *node, char *buf, size_t sz);
+static int ext2fs_truncate(fs_node_t *node, size_t sz);
+static int ext2fs_mknod(fs_node_t *node, const char *name, mode_t mode);
+static int ext2fs_unlink(fs_node_t *node, const char *name);
+static int ext2fs_link(fs_node_t *node, const char *name, fs_node_t *target);
+static int ext2fs_symlink(fs_node_t *node, const char *name, const char *target);
+static int ext2fs_chmod(fs_node_t *node, mode_t mode);
+static int ext2fs_chown(fs_node_t *node, uid_t uid, gid_t gid);
 
 /* filesystem operations */
 static int ext2fs_root(ext2_fs_t *fs, ext2_inode_t *ino, fs_node_t *fnode);
@@ -110,8 +123,10 @@ static int read_block_inode(ext2_fs_t *fs, ext2_inode_t *ino, uint32_t off, uint
 static int write_block_inode(ext2_fs_t *fs, ext2_inode_t *ino, uint32_t ino_no, uint32_t off, uint8_t *buf) {
     /* allocate blocks if they do not exist */
     uint32_t b;
+    int ret = 0;
     while(off >= (b = get_content_blocks(fs, ino->i_blocks)))
-        alloc_inode_block(fs, ino, ino_no, b);
+        if((ret = alloc_inode_block(fs, ino, ino_no, b)) != E_SUCCESS)
+            return ret;
 
     return write_block(fs, get_real_block(fs, ino, off), buf);
 }
@@ -320,7 +335,8 @@ static uint32_t alloc_block(ext2_fs_t *fs) {
         if(fs->bgdt[bg].bg_free_blocks_count == 0) continue;
 
         read_block(fs, fs->bgdt[bg].bg_block_bitmap, (uint8_t *)buf);
-        for(blocki = 0; blocki < fs->block_sz / sizeof(uint32_t); blocki++) {
+        for(blocki = 0; blocki < (fs->sb->s_blocks_per_group>>3) / sizeof(uint32_t); blocki++) {
+            /* the bitmap SHOULD mark block 0 as used */
             if((blockoff = ffsl(~buf[blocki]))) {
                 /* found bit offset + block index + block group index */
                 blockno = blockoff-1 + 32*blocki + bg*fs->sb->s_blocks_per_group;
@@ -356,6 +372,100 @@ found:
 }
 
 /**
+ * free_block takes an inode number and frees it.
+ */
+static int free_block(ext2_fs_t *fs, uint32_t block) {
+    uint32_t bg, bgi, blockoff, blocki, *bitmap;
+
+    if(block == 0) {
+        DPRINTF(ERROR, "trying to free block 0\n");
+        return E_BADBLOCK;
+    }
+
+    bg  = block / fs->sb->s_blocks_per_group;
+    bgi = block % fs->sb->s_blocks_per_group;
+    blockoff = bgi / 32;
+    blocki   = bgi % 32;
+
+    bitmap = kmalloc(fs->block_sz);
+    read_block(fs, fs->bgdt[bg].bg_block_bitmap, (void *)bitmap);
+    bitmap[blockoff] |= 1<<blocki;
+    write_block(fs, fs->bgdt[bg].bg_block_bitmap, (void *)bitmap);
+    kfree(bitmap);
+
+    return E_SUCCESS;
+}
+
+/**
+ * alloc_inode will allocate a free inode and return it.
+ * Returns zero on error.
+ */
+static uint32_t alloc_inode(ext2_fs_t *fs) {
+    uint32_t inono, blocki, blockoff, bg;
+    uint32_t *buf = kmalloc(fs->block_sz);
+
+    for(bg = 0, inono = 0; bg < fs->bgdt_sz; bg++) {
+        if(fs->bgdt[bg].bg_free_inodes_count == 0) continue;
+
+        read_block(fs, fs->bgdt[bg].bg_inode_bitmap, (uint8_t *)buf);
+        for(blocki = 0; blocki < (fs->sb->s_inodes_per_group>>3) / sizeof(uint32_t); blocki++) {
+            /* the bitmap SHOULD mark the reserved inodes as used */
+            if((blockoff = ffsl(~buf[blocki]))) {
+                /* found bit offset (+1 because inode) + block index + block group index */
+                inono = blockoff + 32*blocki + bg*fs->sb->s_inodes_per_group;
+                goto found;
+            }
+        }
+    }
+found:
+    if(!inono) {
+        DPRINTF(CRITICAL, "no free inodes left\n");
+        kfree(buf);
+        return 0;
+    }
+
+    buf[blocki] |= 1 << (blockoff-1);
+    write_block(fs, fs->bgdt[bg].bg_inode_bitmap, (uint8_t *)buf);
+
+    /* update the BGDT */
+    fs->bgdt[bg].bg_free_inodes_count--;
+    for(uint32_t i = 0; i < fs->bgdt_block_sz; i++)
+        write_block(fs, fs->bgdt_off + i, (void *)fs->bgdt + fs->block_sz*i);
+
+    /* update the superblock */
+    fs->sb->s_free_inodes_count--;
+    write_superblock(fs);
+
+    kfree(buf);
+    return inono;
+}
+
+/**
+ * free_inode takes an inode number and frees it.
+ */
+static int free_inode(ext2_fs_t *fs, uint32_t ino_no) {
+    uint32_t bg, bgi, blockoff, blocki, *bitmap;
+
+    if(ino_no-- == 0) {
+        DPRINTF(ERROR, "trying to free inode 0\n");
+        return E_BADBLOCK;
+    }
+
+    bg  = ino_no / fs->sb->s_inodes_per_group;
+    bgi = ino_no % fs->sb->s_inodes_per_group;
+    blockoff = bgi / 32;
+    blocki   = bgi % 32;
+
+    bitmap = kmalloc(fs->block_sz);
+    read_block(fs, fs->bgdt[bg].bg_inode_bitmap, (void *)bitmap);
+    bitmap[blockoff] |= 1<<blocki;
+    write_block(fs, fs->bgdt[bg].bg_inode_bitmap, (void *)bitmap);
+    kfree(bitmap);
+
+    return E_SUCCESS;
+}
+
+/**
  * alloc_inode_block allocates a block at the specified offset in the inode.
  *
  * BUG: if an indirect block doesn't exist, it will allocate the first "content"
@@ -373,6 +483,92 @@ static int alloc_inode_block(ext2_fs_t *fs, ext2_inode_t *ino, uint32_t ino_no, 
     uint32_t sectors = get_block_count(fs, block+1);
     if(ino->i_blocks < sectors) ino->i_blocks = sectors;
     return write_inode(fs, ino, ino_no);
+}
+
+static int free_inode_block(ext2_fs_t *fs, ext2_inode_t *ino, uint32_t ino_no, uint32_t block);
+
+/**
+ * create_dirent creates a directory entry in parent to the specified inode.
+ *
+ * Returns zero or a negative errno.
+ */
+static int create_dirent(fs_node_t *parent, uint32_t ino_no, const char *name, uint8_t type) {
+    ext2_fs_t *fs = parent->device;
+    ext2_inode_t *pino = read_inode(fs, parent->inode);
+    /* we trust the fs_* functions to have checked that
+     * the parent and name are correct */
+
+    int ret = create_dirent2(fs, pino, parent->inode, ino_no, name, type);
+    kfree(pino);
+    return ret;
+}
+
+/**
+ * create_dirent2 is the same as create_dirent, but takes different arguments.
+ */
+static int create_dirent2(ext2_fs_t *fs, ext2_inode_t *pino, uint32_t pino_no, uint32_t ino_no, const char *name, uint8_t type) {
+    size_t name_len = strlen(name);
+    /* rec_len has to be divisible by 4 */
+    size_t rec_len = (sizeof(ext2_dir_entry_t) + name_len + 3) & ~3;
+
+    uint32_t blockno = 0, offset = 0;
+    uint8_t *buf = kmalloc(fs->block_sz);
+    read_block_inode(fs, pino, blockno, buf);
+    ext2_dir_entry_t *dirent = (void *)buf;
+    int found = 0, ret = 0;
+
+    while(offset < pino->i_size) {
+        if(!dirent->inode && dirent->rec_len >= rec_len) {
+            /* our entry fits in this empty entry, replace it */
+            found = 1;
+            break;
+        }
+
+        /* if the record spans to the end of the block,
+         * we can maybe fit our direntry in the same block? */
+        uint16_t real_rec_len = (sizeof(ext2_dir_entry_t) + dirent->name_len + 3) & ~3;
+        if(real_rec_len != dirent->rec_len &&
+           (fs->block_sz - (real_rec_len + offset % fs->block_sz)) >= rec_len) {
+            dirent->rec_len = real_rec_len;
+
+            offset += real_rec_len;
+            dirent = (void *)dirent + real_rec_len;
+
+            dirent->rec_len = fs->block_sz - offset;
+            found = 1;
+            break;
+        }
+
+        offset += dirent->rec_len;
+        dirent = (void *)dirent + dirent->rec_len;
+
+        if((uintptr_t)dirent - (uintptr_t)buf >= fs->block_sz) {
+            dirent = (void *)dirent - fs->block_sz;
+            /* will error on an OOB read, which we rely on so
+             * we can't use this for error handling reliably */
+            read_block_inode(fs, pino, ++blockno, buf);
+        }
+    }
+
+    if(!found) {
+        /* we exceeded the node size, which means buf is an empty block */
+        dirent->rec_len = fs->block_sz;
+        pino->i_size += fs->block_sz;
+        write_inode(fs, pino, pino_no);
+    }
+
+    dirent->inode = ino_no;
+    dirent->name_len = name_len;
+    dirent->type = type;
+    memcpy(dirent->name, name, name_len);
+
+    /* TODO: don't assume every error is ENOSPC */
+    ret = write_block_inode(fs, pino, pino_no, blockno, buf)
+        ? -ENOSPC
+        : 0;
+
+    kfree(buf);
+    return ret;
 }
 
 /**
@@ -741,12 +937,17 @@ static fs_node_t *fnode_from_dirent(ext2_fs_t *fs, ext2_inode_t *ino, ext2_dir_e
         fnode->flags |= FS_FLAG_IFREG;
         fnode->read = ext2fs_read;
         fnode->write = ext2fs_write;
+        fnode->truncate = ext2fs_truncate;
         break;
 
     case EXT2_TYPE_DIR:
         fnode->flags |= FS_FLAG_IFDIR;
         fnode->readdir = ext2fs_readdir;
         fnode->finddir = ext2fs_finddir;
+        fnode->mknod = ext2fs_mknod;
+        fnode->unlink = ext2fs_unlink;
+        fnode->link = ext2fs_link;
+        fnode->symlink = ext2fs_symlink;
         break;
 
     case EXT2_TYPE_BLOCK:
@@ -774,6 +975,8 @@ static fs_node_t *fnode_from_dirent(ext2_fs_t *fs, ext2_inode_t *ino, ext2_dir_e
 
     fnode->open = ext2fs_open;
     fnode->close = ext2fs_close;
+    fnode->chmod = ext2fs_chmod;
+    fnode->chown = ext2fs_chown;
 
     return fnode;
 }
@@ -889,7 +1092,6 @@ static fs_node_t *ext2fs_finddir(fs_node_t *node, const char *name) {
 static ssize_t ext2fs_readlink(fs_node_t *node, char *buf, size_t sz) {
     ext2_fs_t *fs = node->device;
     ext2_inode_t *ino = read_inode(fs, node->inode);
-    if(!ino) return -1;
 
     size_t read_sz = ino->i_size > sz ? sz : ino->i_size;
 
@@ -905,6 +1107,185 @@ static ssize_t ext2fs_readlink(fs_node_t *node, char *buf, size_t sz) {
 
     kfree(ino);
     return read_sz;
+}
+
+static int ext2fs_truncate(fs_node_t *node, size_t sz) {
+    return 0;
+}
+
+static int ext2fs_mknod(fs_node_t *node, const char *name, mode_t mode) {
+    ext2_fs_t *fs = node->device;
+    int ret = 0;
+
+    /* allocate an inode */
+    uint32_t newino_no = alloc_inode(fs);
+    if(!newino_no) return -ENOSPC;
+    ext2_inode_t *newino = kmalloc(fs->inode_sz);
+    memset(newino, 0, fs->inode_sz);
+
+    /* TODO: actual time */
+    newino->i_atime = newino->i_ctime = newino->i_mtime = 0;
+    newino->i_dtime = 0;
+
+    /* TODO: users? */
+    newino->i_uid = 0;
+    newino->i_gid = 0;
+
+    newino->i_links_count = 1;
+    newino->i_mode = mode;
+    /* all other fields are zero */
+
+    /* create directory entry */
+    if((ret = create_dirent(node, newino_no, name, EXT2_DIRENT_TYPE_LINK))) {
+        /* free the new inode on failure */
+        free_inode(fs, newino_no);
+        goto ret_free;
+    }
+
+    /* if the new node is a directory we need to create . and .. */
+    if((newino->i_mode & EXT2_TYPE_MASK) == EXT2_TYPE_DIR) {
+        newino->i_links_count += 2;
+
+        /* this will leave a mess if it errors... */
+        if((ret = create_dirent2(fs, newino, newino_no, newino_no, ".", EXT2_DIRENT_TYPE_DIR)))
+            goto ret_free;
+        if((ret = create_dirent2(fs, newino, newino_no, node->inode, "..", EXT2_DIRENT_TYPE_DIR)))
+            goto ret_free;
+    }
+
+    /* save the inode to disk */
+    write_inode(fs, newino, newino_no);
+    ret = 0;
+ret_free:
+    kfree(newino);
+    return ret;
+}
+
+static int ext2fs_unlink(fs_node_t *node, const char *name) {
+    return 0;
+}
+
+static int ext2fs_link(fs_node_t *node, const char *name, fs_node_t *target) {
+    ext2_fs_t *fs = node->device;
+    int ret;
+    if(node->device != target->device) return -EXDEV;
+
+    /* read target inode */
+    ext2_inode_t *ino = read_inode(fs, target->inode);
+    uint8_t dirent_type = EXT2_DIRENT_TYPE_UNK;
+    switch(ino->i_mode & EXT2_TYPE_MASK) {
+    case EXT2_TYPE_REG:
+        dirent_type = EXT2_DIRENT_TYPE_REG;
+        break;
+
+    case EXT2_TYPE_DIR:
+        /* cannot make a hardlink to a directory */
+        ret = -EISDIR;
+        goto ret_free;
+
+    case EXT2_TYPE_CHAR:
+        dirent_type = EXT2_DIRENT_TYPE_CHAR;
+        break;
+
+    case EXT2_TYPE_BLOCK:
+        dirent_type = EXT2_DIRENT_TYPE_BLOCK;
+        break;
+
+    case EXT2_TYPE_FIFO:
+        dirent_type = EXT2_DIRENT_TYPE_FIFO;
+        break;
+
+    case EXT2_TYPE_SOCK:
+        dirent_type = EXT2_DIRENT_TYPE_SOCK;
+        break;
+
+    case EXT2_TYPE_LINK:
+        dirent_type = EXT2_DIRENT_TYPE_LINK;
+        break;
+    }
+
+    /* create the directory entry */
+    if((ret = create_dirent(node, target->inode, name, dirent_type)))
+        goto ret_free;
+
+    /* increment the link count on success */
+    ino->i_links_count++;
+    write_inode(fs, ino, target->inode);
+
+    ret = 0;
+ret_free:
+    kfree(ino);
+    return ret;
+}
+
+static int ext2fs_symlink(fs_node_t *node, const char *name, const char *target) {
+    ext2_fs_t *fs = node->device;
+    int ret = 0;
+
+    /* allocate an inode */
+    uint32_t newino_no = alloc_inode(fs);
+    if(!newino_no) return -ENOSPC;
+    ext2_inode_t *newino = kmalloc(fs->inode_sz);
+    memset(newino, 0, fs->inode_sz);
+
+    /* TODO: actual time */
+    newino->i_atime = newino->i_ctime = newino->i_mtime = 0;
+    newino->i_dtime = 0;
+
+    /* TODO: users? */
+    newino->i_uid = 0;
+    newino->i_gid = 0;
+
+    newino->i_links_count = 1;
+    newino->i_mode = EXT2_TYPE_LINK | 0777;
+    /* all other fields are zero */
+
+    /* create directory entry */
+    if((ret = create_dirent(node, newino_no, name, EXT2_DIRENT_TYPE_LINK))) {
+        /* free the new inode on failure */
+        free_inode(fs, newino_no);
+        goto ret_free;
+    }
+
+    /* write the actual link */
+    size_t target_len = strlen(target);
+    if(target_len <= sizeof newino->i_block) {
+        memcpy(newino->i_block, target, target_len);
+        newino->i_size = target_len;
+        write_inode(fs, newino, newino_no);
+    } else {
+        /* this will write the inode, since the size will change */
+        write_buffer_inode(fs, newino, newino_no, 0, target_len, (uint8_t *)target);
+    }
+
+    ret = 0;
+ret_free:
+    kfree(newino);
+    return ret;
+}
+
+static int ext2fs_chmod(fs_node_t *node, mode_t mode) {
+    ext2_fs_t *fs = node->device;
+    ext2_inode_t *ino = read_inode(fs, node->inode);
+
+    ino->i_mode &= ~07777;
+    ino->i_mode |= (uint16_t)mode;
+
+    write_inode(fs, ino, node->inode);
+
+    return 0;
+}
+
+static int ext2fs_chown(fs_node_t *node, uid_t uid, gid_t gid) {
+    ext2_fs_t *fs = node->device;
+    ext2_inode_t *ino = read_inode(fs, node->inode);
+
+    ino->i_uid = (uint16_t)uid;
+    ino->i_gid = (uint16_t)gid;
+
+    write_inode(fs, ino, node->inode);
+
+    return 0;
 }
 
 /**
@@ -931,13 +1312,16 @@ static int ext2fs_root(ext2_fs_t *fs, ext2_inode_t *ino, fs_node_t *fnode) {
     }
     fnode->flags = FS_FLAG_IFDIR | FS_FLAG_MOUNT;
 
-    fnode->read = NULL;
-    fnode->write = NULL;
     fnode->open = ext2fs_open;
     fnode->close = ext2fs_close;
     fnode->readdir = ext2fs_readdir;
     fnode->finddir = ext2fs_finddir;
-    fnode->readlink = NULL;
+    fnode->mknod = ext2fs_mknod;
+    fnode->unlink = ext2fs_unlink;
+    fnode->link = ext2fs_link;
+    fnode->symlink = ext2fs_symlink;
+    fnode->chmod = ext2fs_chmod;
+    fnode->chown = ext2fs_chown;
     return 0;
 }
 
