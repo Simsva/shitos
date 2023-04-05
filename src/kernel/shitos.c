@@ -54,12 +54,9 @@ void kmain(struct kernel_args *args) {
     printf("fs_tree:\n");
     tree_debug_dump(fs_tree, tree_print_fs);
 
-    fs_mknod("/lnk", S_IFLNK|0777);
-    fs_mknod("/reg", S_IFREG|0777);
-    fs_mknod("/blk", S_IFBLK|0777);
-    fs_mknod("/chr", S_IFCHR|0777);
-    fs_mknod("/fifo", S_IFIFO|0777);
-    fs_mknod("/sock", S_IFSOCK|0777);
+    fs_node_t *file = kopen("/test", 0);
+    fs_truncate(file, 16);
+    fs_truncate(file, 0x1001);
 
     for(;;) asm volatile("hlt");
 }
