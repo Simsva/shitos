@@ -54,9 +54,5 @@ void kmain(struct kernel_args *args) {
     printf("fs_tree:\n");
     tree_debug_dump(fs_tree, tree_print_fs);
 
-    fs_node_t *file = kopen("/test", 0);
-    fs_truncate(file, 16);
-    fs_truncate(file, 0x1001);
-
     for(;;) asm volatile("hlt");
 }

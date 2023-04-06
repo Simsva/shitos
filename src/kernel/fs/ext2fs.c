@@ -1,7 +1,8 @@
 /**
  * @brief EXT2 filesystem driver
  *
- * TODO: free blocks, allocate/free inodes
+ * Note that this implementation has many known deficiencies, inefficiencies,
+ * and bugs.
  */
 #include <ext2fs/ext2.h>
 #include <kernel/fs.h>
@@ -44,6 +45,8 @@ static uint32_t get_real_block(ext2_fs_t *fs, ext2_inode_t *ino, uint32_t block)
 static int set_real_block(ext2_fs_t *fs, ext2_inode_t *ino, uint32_t ino_no, uint32_t ino_block, uint32_t real_block);
 static uint32_t get_block_count(ext2_fs_t *fs, uint32_t blocks);
 static uint32_t get_content_blocks(ext2_fs_t *fs, uint32_t sectors);
+static size_t count_dirent(ext2_fs_t *fs, ext2_inode_t *ino);
+static ext2_dir_entry_t *find_dirent(ext2_fs_t *fs, ext2_inode_t *ino, const char *name, ext2_dir_entry_t **prev, uint8_t **blockbuf, uint32_t *blockno);
 static fs_node_t *fnode_from_dirent(ext2_fs_t *fs, ext2_inode_t *ino, ext2_dir_entry_t *dirent);
 
 /* file operations */
@@ -711,9 +714,9 @@ static int create_dirent(fs_node_t *parent, uint32_t ino_no, const char *name, u
  * create_dirent2 is the same as create_dirent, but takes different arguments.
  */
 static int create_dirent2(ext2_fs_t *fs, ext2_inode_t *pino, uint32_t pino_no, uint32_t ino_no, const char *name, uint8_t type) {
-    size_t name_len = strlen(name);
+    uint8_t name_len = strlen(name);
     /* rec_len has to be divisible by 4 */
-    size_t rec_len = (sizeof(ext2_dir_entry_t) + name_len + 3) & ~3;
+    uint16_t rec_len = (sizeof(ext2_dir_entry_t) + name_len + 3) & ~3;
 
     uint32_t blockno = 0, offset = 0;
     uint8_t *buf = kmalloc(fs->block_sz);
@@ -728,17 +731,17 @@ static int create_dirent2(ext2_fs_t *fs, ext2_inode_t *pino, uint32_t pino_no, u
             break;
         }
 
-        /* if the record spans to the end of the block,
-         * we can maybe fit our direntry in the same block? */
+        /* if the record spans longer than it needs we can maybe fit our
+         * direntry in the unused space? */
         uint16_t real_rec_len = (sizeof(ext2_dir_entry_t) + dirent->name_len + 3) & ~3;
-        if(real_rec_len != dirent->rec_len &&
-           (fs->block_sz - (real_rec_len + offset % fs->block_sz)) >= rec_len) {
+        if(dirent->rec_len - real_rec_len >= rec_len) {
+            uint32_t space = dirent->rec_len - real_rec_len;
             dirent->rec_len = real_rec_len;
 
             offset += real_rec_len;
             dirent = (void *)dirent + real_rec_len;
 
-            dirent->rec_len = fs->block_sz - offset;
+            dirent->rec_len = space;
             found = 1;
             break;
         }
@@ -1110,6 +1113,81 @@ static uint32_t get_content_blocks(ext2_fs_t *fs, uint32_t sectors) {
 }
 
 /**
+ * count_dirent returns the amount of valid directory entries in the specified
+ * inode, excluding "." and "..".
+ */
+static size_t count_dirent(ext2_fs_t *fs, ext2_inode_t *ino) {
+    uint32_t offset = 0, blockno = 0;
+    uint8_t *buf = kmalloc(fs->block_sz);
+    read_block_inode(fs, ino, blockno, buf);
+    ext2_dir_entry_t *dirent = (void *)buf;
+
+    size_t count = 0;
+    while(offset < ino->i_size) {
+        /* increment count for every valid, non . and .. entries */
+        count += dirent->inode
+            && !(dirent->name_len == 1 && dirent->name[0] == '.')
+            && !(dirent->name_len == 2 && dirent->name[0] == '.'
+                                       && dirent->name[1] == '.');
+
+        offset += dirent->rec_len;
+        dirent = (void *)dirent + dirent->rec_len;
+
+        if((uintptr_t)dirent - (uintptr_t)buf >= fs->block_sz) {
+            dirent = (void *)dirent + dirent->rec_len;
+            read_block_inode(fs, ino, ++blockno, buf);
+        }
+    }
+
+    return count;
+}
+
+/**
+ * find_dirent returns a directory entry in an inode matching the specified name.
+ * The caller needs to free blockbuf if successful. Returns NULL on failure.
+ */
+static ext2_dir_entry_t *find_dirent(ext2_fs_t *fs, ext2_inode_t *ino, const char *name, ext2_dir_entry_t **prev, uint8_t **blockbuf, uint32_t *blockno) {
+    char namebuf[256];
+    uint32_t offset = 0;
+    *blockno = 0;
+    *blockbuf = kmalloc(fs->block_sz);
+    read_block_inode(fs, ino, *blockno, *blockbuf);
+    ext2_dir_entry_t *dirent = (void *)*blockbuf;
+    int found = 0;
+    size_t name_len = strlen(name);
+
+    if(prev) *prev = NULL;
+    while(offset < ino->i_size) {
+        /* only test real possibilities */
+        if(dirent->inode && dirent->name_len == name_len) {
+            /* NOTE: a memcmp could read OOB on the given name */
+            memcpy(namebuf, dirent->name, dirent->name_len);
+            namebuf[dirent->name_len] = '\0';
+            if(!strcmp(namebuf, name)) {
+                found = 1;
+                break;
+            }
+        }
+
+        offset += dirent->rec_len;
+        if(prev) *prev = dirent;
+        dirent = (void *)dirent + dirent->rec_len;
+
+        if((uintptr_t)dirent - (uintptr_t)*blockbuf >= fs->block_sz) {
+            dirent = (void *)dirent - fs->block_sz;
+            if(prev) *prev = NULL;
+            read_block_inode(fs, ino, ++*blockno, *blockbuf);
+        }
+    }
+    if(!found || dirent->inode == 0) {
+        kfree(*blockbuf);
+        return NULL;
+    }
+
+    return dirent;
+}
+
+/**
  * Return a VFS node from a EXT2 directory entry and inode.
  * If ino is NULL, it will be read from dirent. The caller can provide it if it
  * already exists to avoid reading it twice.
@@ -1252,45 +1330,22 @@ static struct dirent *ext2fs_readdir(fs_node_t *node, off_t idx) {
 
 static fs_node_t *ext2fs_finddir(fs_node_t *node, const char *name) {
     ext2_fs_t *fs = node->device;
-    ext2_inode_t *ino = read_inode(fs, node->inode);
+    ext2_inode_t *ino = read_inode(fs, node->inode),
+                 *target;
 
-    char namebuf[256];
-    uint32_t blockno = 0, offset = 0;
-    uint8_t *buf = kmalloc(fs->block_sz);
-    read_block_inode(fs, ino, blockno, buf);
-    ext2_dir_entry_t *dirent = (void *)buf;
-    int found = 0;
-    size_t name_len = strlen(name);
-
-    while(offset < node->sz) {
-        /* only test real possibilities */
-        if(dirent->inode && dirent->name_len == name_len) {
-            /* NOTE: a memcmp could read OOB on the given name */
-            memcpy(namebuf, dirent->name, dirent->name_len);
-            namebuf[dirent->name_len] = '\0';
-            if(!strcmp(namebuf, name)) {
-                found = 1;
-                break;
-            }
-        }
-
-        offset += dirent->rec_len;
-        dirent = (void *)dirent + dirent->rec_len;
-
-        if((uintptr_t)dirent - (uintptr_t)buf >= fs->block_sz) {
-            dirent = (void *)dirent - fs->block_sz;
-            read_block_inode(fs, ino, ++blockno, buf);
-        }
-    }
-    if(!found || dirent->inode == 0) {
-        kfree(buf);
+    uint8_t *buf;
+    uint32_t blockno;
+    ext2_dir_entry_t *dirent = find_dirent(fs, ino, name, NULL, &buf, &blockno);
+    if(!dirent) {
         kfree(ino);
         return NULL;
     }
-    ino = read_inode(fs, dirent->inode);
-    fs_node_t *fnode = fnode_from_dirent(fs, ino, dirent);
+
+    target = read_inode(fs, dirent->inode);
+    fs_node_t *fnode = fnode_from_dirent(fs, target, dirent);
 
     kfree(ino);
+    kfree(target);
     kfree(buf);
     return fnode ? fnode : NULL;
 }
@@ -1406,7 +1461,71 @@ ret_free:
 static int ext2fs_unlink(fs_node_t *node, const char *name) {
     ext2_fs_t *fs = node->device;
     if(!(fs->flags & EXT2_FLAG_RW)) return -EROFS;
-    return 0;
+
+    uint8_t *buf;
+    uint32_t blockno;
+    ext2_inode_t *pino = read_inode(fs, node->inode);
+    ext2_dir_entry_t *prev;
+    ext2_dir_entry_t *dirent = find_dirent(fs, pino, name, &prev, &buf, &blockno);
+    if(!dirent) {
+        kfree(pino);
+        return -ENOENT;
+    }
+    ext2_inode_t *target = read_inode(fs, dirent->inode);
+    int ret = 0;
+
+    int remove = 0;
+    if((target->i_mode & EXT2_TYPE_MASK) == EXT2_TYPE_DIR) {
+        /* only unlink empty directories */
+        if(count_dirent(fs, target) == 0) {
+            free_inode_blocks(fs, target, 0);
+            free_inode(fs, dirent->inode);
+            remove = 1;
+        } else {
+            /* I think this errno is non-POSIX */
+            ret = -EISDIR;
+            remove = 0;
+        }
+    } else {
+        if(target->i_links_count-- == 0) {
+            free_inode_blocks(fs, target, 0);
+            free_inode(fs, dirent->inode);
+        }
+        remove = 1;
+    }
+    kfree(target);
+
+    int free_block = 0;
+    if(remove) {
+        /* empty the entry */
+        dirent->inode = 0;
+        if(prev) {
+            /* if a previous entry exists, extend it to cover the old entry */
+            prev->rec_len += dirent->rec_len;
+
+            /* used in checks later */
+            dirent = prev;
+        }
+
+        /* check if only one entry remains in the block,
+         * the entry is empty, and if said block is the last */
+        free_block = !dirent->inode && dirent->rec_len == fs->block_sz
+                     && pino->i_size == (blockno+1) * fs->block_sz;
+
+        /* BUG: this can leave an entire block with an empty entry in it.
+         * Later, if the next block gets freed, the empty block will still
+         * remain allocated. */
+    }
+
+    if(free_block) {
+        free_inode_block(fs, pino, blockno);
+        write_inode(fs, pino, node->inode);
+    } else if(remove)
+        write_block_inode(fs, pino, node->inode, blockno, buf);
+
+    kfree(buf);
+    kfree(pino);
+    return ret;
 }
 
 static int ext2fs_link(fs_node_t *node, const char *name, fs_node_t *target) {
