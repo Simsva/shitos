@@ -16,6 +16,7 @@
 
     ;; Misc constants
     %define NSECT 0x20          ; number of sectors of stage2 to read
+    %define BOOT_MAGIC 0xb007beef ; header magic value to detect this partition
 
 section .text
 
@@ -24,34 +25,12 @@ _start:
     jmp _realstart
     nop
 
-    ;; FIXME: why is there a BPB if this is not a FAT partition anymore?
-                 db 'SHTOS1.0'
-                 dw 512
-bpb_spercluster: db 2
-bpb_sreserved:   dw 6270
-bpb_fats:        db 2
-                 dw 0
-                 dw 0
-                 db 0xF8
-                 dw 0
-bpb_sectors:     dw 63
-bpb_heads:       dw 255
-bpb_startlba:    dd 0
-                 dd 253952
-bpb_sperfat:     dd 961
-                 dw 0x0000
-                 dw 0x0000
-bpb_rootdir:     dd 2
-                 dw 1
-                 dw 6
-temp_fatsector:  times 4 db 0x00
-temp_datastart:  times 8 db 0x00
-bpb_drivenumber: db 0x80
-                 db 0x00
-                 db 0x29
-                 dd 0x12345678
-                 db 'SHITOS     '
-                 db 'FAT32   '
+header:
+    db 0                        ; pad
+    dq 0xb007beef
+
+    ;; legacy offset due to FAT32
+times 0x5a-($-$$) db 0
 
     ;; Trampoline to call read from stage2
     ;; Copied from FreeBSD
