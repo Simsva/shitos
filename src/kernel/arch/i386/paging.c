@@ -1,4 +1,4 @@
-#include "paging.h"
+#include <kernel/arch/i386/paging.h>
 
 #include <kernel/kmem.h>
 #include <sys/utils.h>
@@ -7,10 +7,11 @@
 #include <stdio.h>
 #include <ansi.h>
 
-#include "idt.h"
+#include <kernel/arch/i386/idt.h>
 
 /* globals */
 extern void *kernel_pd;
+void *buffer_pt;
 
 /* frame bitset */
 uint32_t *frames, frame_count;
@@ -39,7 +40,7 @@ uint32_t frame_test(uint32_t frame_addr) {
     return frames[index] & (1<<offset);
 }
 
-uint32_t frame_find_first() {
+uint32_t frame_find_first(void) {
     uint32_t i, x;
 
     /* NOTE: skips the first MiB as it contains a lot of reserved memory */
@@ -66,9 +67,9 @@ void i386_map_page(void *paddr, void *vaddr, uint8_t flags) {
     uint32_t *pt = (uint32_t *)0xffc00000 + 0x400 * pdi;
 
     if(!(pd[pdi] & 0x1)) {
-        /* TODO: allocate memory for a PT */
-        puts("PD entry not present");
-        return;
+        pd[pdi] = (uint32_t)buffer_pt | 0x1;
+        buffer_pt = NULL;
+        /* TODO: allocate a new buffer */
     }
 
     if(pt[pti] & 0x1) {
@@ -77,6 +78,7 @@ void i386_map_page(void *paddr, void *vaddr, uint8_t flags) {
         return;
     }
 
+    frame_set((uint32_t)paddr);
     pt[pti] = (uint32_t)paddr | (flags & 0xfff) | 0x1;
 
     asm("mov %%cr3, %%eax; mov %%eax, %%cr3" ::: "%eax");
@@ -90,6 +92,7 @@ void i386_unmap_page(void *vaddr) {
     uint32_t *pt = (uint32_t *)0xffc00000 + 0x400 * pdi;
 
     if(!(pd[pdi] & 0x1)) return;
+    frame_unset((uint32_t)i386_get_paddr(vaddr));
     pt[pti] = 0;
 
     /* remove PD entry when empty */

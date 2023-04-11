@@ -10,7 +10,7 @@ extern idt_install
 extern irq_install
 extern isrs_install
 
-extern keyboard_init
+extern vmem_init
 
 extern _kernel_lowtext_start
 extern _kernel_text_start
@@ -88,7 +88,7 @@ _highstart:
     call irq_install
     call isrs_install
      
-    call keyboard_init
+    call vmem_init
 
     sti
 

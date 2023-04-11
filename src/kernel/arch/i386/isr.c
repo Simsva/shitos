@@ -1,11 +1,11 @@
-#include "isr.h"
+#include <kernel/arch/i386/isr.h>
 
 #include <stdint.h>
 #include <stdio.h>
 #include <ansi.h>
 
-#include "idt.h"
-#include "fault_handlers.h"
+#include <kernel/arch/i386/idt.h>
+#include <kernel/arch/i386/fault_handlers.h>
 
 extern void _isr00(void);
 extern void _isr01(void);

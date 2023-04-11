@@ -5,7 +5,7 @@ int printf(const char *restrict fmt, ...) {
     va_list ap;
     int r;
     va_start(ap, fmt);
-    r = vprintf(fmt, ap);
+    r = vfprintf(stdout, fmt, ap);
     va_end(ap);
     return r;
 }

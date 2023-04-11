@@ -1,6 +1,9 @@
 #include <kernel/input/keyboard.h>
 #include <stdio.h>
 #include <kernel/input/usb_keycodes.h>
+#include <kernel/fs.h>
+
+extern fs_node_t *kbd_pipe;
 
 static const char *us_keymap[][256] = {
     { /* bare */
@@ -53,6 +56,8 @@ void handle_kb_input(struct kb_packet keypress) {
 
     */
     
-    printf("%x ", us_keymap[0][keypress.keycode]);
+    printf("%s keycodes", us_keymap[0][keypress.keycode]);
+
+    fs_write(kbd_pipe, 0, 1, "c");
 }
 

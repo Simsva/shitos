@@ -1,5 +1,12 @@
 #include <stdint.h>
 
+/* Be careful when using higher half things */
+#include <kernel/vmem.h>
+
+/* this whole file is a big array bounds violation, so just ignore errors */
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Warray-bounds"
+
 #define KERNEL_MAP 0xc0000000
 #define PADDR(a) ((void *)(a) - (KERNEL_MAP))
 #define FCOUNT (*(uint32_t *)PADDR(&frame_count))
@@ -16,30 +23,27 @@ extern uint32_t *frames;
 
 /* early pre-paging setup */
 __attribute__((section(".low.text"))) void paging_init(void) {
-    void *kmem_head_low, *ptbase, *srccur;
+    void **kmem_head_low, *ptbase, *srccur;
     uint32_t *pd, *pdcur, *ptcur, *vga_pt;
 
     /* get physical address of kmem_head */
-    kmem_head_low = *(void **)PADDR(&kmem_head);
+    kmem_head_low = (void **)PADDR(&kmem_head);
     /* get physical address of pd */
     pd = (uint32_t *)PADDR(&kernel_pd);
     pdcur = pd + (KERNEL_MAP>>22);
 
-    vga_pt = kmem_head_low;
-    ptbase = kmem_head_low + 0x1000;
+    vga_pt = *kmem_head_low;
+    ptbase = *kmem_head_low + 0x1000;
     srccur = (void *)0;
     ptcur = ptbase;
 
     /* identity map first page table */
     pd[0] = (uint32_t)ptbase | 0x1;
 
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Warray-bounds"
     /* zero out frame bitset, I do not dare use other higher-half functions in
      * this cursed C code, so no memset */
     for(uint32_t i = 0; i < ((FCOUNT+31) >> 5); i++)
         FRAMES[i] = 0;
-#pragma GCC diagnostic pop
 
     *pdcur++ = (uint32_t)ptbase | 0x1;
     for(;;) {
@@ -47,7 +51,8 @@ __attribute__((section(".low.text"))) void paging_init(void) {
             *ptcur = (uint32_t)srccur | 0x1;
             SET_FRAME((uint32_t)srccur >> 12);
         }
-        if(srccur >= ptbase)
+        /* map enough memory for the kernel heap too */
+        if(srccur >= ptbase + VMEM_HEAP_INITIAL_SZ)
             break;
 
         srccur += 0x1000;
@@ -70,5 +75,7 @@ __attribute__((section(".low.text"))) void paging_init(void) {
     /* set frames to vaddr */
     FRAMES = (void *)FRAMES + KERNEL_MAP;
     /* save vaddr of new kmem_head */
-    kmem_head_low = ptbase + 0x1000 + KERNEL_MAP;
+    *kmem_head_low = ptbase + 0x1000 + KERNEL_MAP;
 }
+
+#pragma GCC diagnostic pop

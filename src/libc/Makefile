@@ -15,6 +15,7 @@ LIBK=$(ROOT)/bin/libk.a
 LIBC_SRC_ASM=$(wildcard **/*.asm)
 LIBC_SRC_C=$(wildcard **/*.c)
 LIBC_SRC_MAKE=$(LIBC_SRC_C:.c=_c.d)
+LIBK_SRC_MAKE=$(LIBC_SRC_MAKE:.d=.libk.d)
 
 # FIXME: differentiate free from hosted objects
 LIBC_OBJ=$(LIBC_SRC_ASM:.asm=_asm.o) $(LIBC_SRC_C:.c=_c.o)

@@ -1,5 +1,5 @@
-#ifndef EXT2_FS_H_
-#define EXT2_FS_H_
+#ifndef EXT2FS_EXT2_FS_H_
+#define EXT2FS_EXT2_FS_H_
 
 #include <stdint.h>
 
@@ -34,6 +34,7 @@
 #define EXT2_FEATURE_ROCOMPAT_BTREE_DIR    0x0004
 
 /* inode */
+#define EXT2_TYPE_MASK  0xf000
 #define EXT2_TYPE_FIFO  0x1000
 #define EXT2_TYPE_CHAR  0x2000
 #define EXT2_TYPE_DIR   0x4000
@@ -67,6 +68,16 @@
 #define EXT2_FL_BTREE        0x00001000 /* btree format dir */
 #define EXT2_FL_AFS          0x00002000 /* no idea */
 #define EXT2_FL_JOURNAL_DATA 0x00002000 /* file should be journaled */
+
+/* dirent */
+#define EXT2_DIRENT_TYPE_UNK   0x0
+#define EXT2_DIRENT_TYPE_REG   0x1
+#define EXT2_DIRENT_TYPE_DIR   0x2
+#define EXT2_DIRENT_TYPE_CHAR  0x3
+#define EXT2_DIRENT_TYPE_BLOCK 0x4
+#define EXT2_DIRENT_TYPE_FIFO  0x5
+#define EXT2_DIRENT_TYPE_SOCK  0x6
+#define EXT2_DIRENT_TYPE_LINK  0x7
 
 /* various constants */
 #define EXT2_NDIR_BLOCKS 12
@@ -177,7 +188,7 @@ struct ext2_dir_entry {
     uint16_t rec_len;
     uint8_t  name_len;
     uint8_t  type; /* high byte of name_len unless EXT2_INCOMPAT_FILETYPE */
-    char     name[255];
+    char     name[]; /* max 255 chars */
 };
 
-#endif // EXT2_FS_H_
+#endif // EXT2FS_EXT2_FS_H_

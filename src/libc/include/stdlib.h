@@ -1,11 +1,10 @@
 #ifndef STDLIB_H_
 #define STDLIB_H_
 
+#include <_cheader.h>
 #include <features.h>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+_BEGIN_C_HEADER
 
 #if __cplusplus >= 201103L
 # define NULL nullptr
@@ -16,6 +15,8 @@ extern "C" {
 #endif
 
 typedef __typeof__(sizeof 0) size_t;
+
+void *malloc(size_t);
 
 typedef struct { int quot, rem; }       div_t;
 typedef struct { long quot, rem; }      ldiv_t;
@@ -28,8 +29,6 @@ lldiv_t lldiv(long long, long long);
 #define EXIT_SUCCESS 0
 #define EXIT_FAILURE 1
 
-#ifdef __cplusplus
-}
-#endif
+_END_C_HEADER
 
 #endif // STDLIB_H_

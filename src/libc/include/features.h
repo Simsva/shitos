@@ -9,4 +9,22 @@
 #define __inline inline
 #endif
 
+#if __STDC_VERSION__ >= 201112L
+#elif defined(__GNUC__)
+#define _Noreturn __attribute__((__noreturn__))
+#else
+#define _Noreturn
+#endif
+
+#define __weak __attribute__((__weak__))
+#define __hidden __attribute__((__visibility__("hidden")))
+#define weak_alias(old, new) \
+    extern __typeof(old) new __attribute__((__weak__, __alias__(#old)))
+
+#ifdef __GNUC__
+#define __unused __attribute__((unused))
+#else
+#define __unused
+#endif
+
 #endif // FEATURES_H_

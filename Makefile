@@ -27,9 +27,9 @@ clean:
 	@echo Cleaning root
 	rm -f $(BUILDFILES)
 
-	@(cd $(ROOT)/src/boot/$(ARCH) && env make clean)
-	@(cd $(ROOT)/src/kernel && env make clean)
-	@(cd $(ROOT)/src/libc && env make clean)
+	@(cd $(ROOT)/src/boot/$(ARCH) && $(MAKE) clean)
+	@(cd $(ROOT)/src/kernel && $(MAKE) clean)
+	@(cd $(ROOT)/src/libc && $(MAKE) clean)
 
 
 clean_root:
@@ -49,20 +49,20 @@ $(DIRS):
 
 
 headers:
-	@(cd $(ROOT)/src/boot/$(ARCH) && env make install_headers)
-	@(cd $(ROOT)/src/kernel && env make install_headers)
-	@(cd $(ROOT)/src/libc && env make install_headers)
+	@(cd $(ROOT)/src/boot/$(ARCH) && $(MAKE) install_headers)
+	@(cd $(ROOT)/src/kernel && $(MAKE) install_headers)
+	@(cd $(ROOT)/src/libc && $(MAKE) install_headers)
 mbr: headers
-	@(cd $(ROOT)/src/boot/$(ARCH) && env make mbr)
+	@(cd $(ROOT)/src/boot/$(ARCH) && $(MAKE) mbr)
 stage1: headers
-	@(cd $(ROOT)/src/boot/$(ARCH) && env make stage1)
+	@(cd $(ROOT)/src/boot/$(ARCH) && $(MAKE) stage1)
 stage2: headers libc
-	@(cd $(ROOT)/src/boot/$(ARCH) && env make stage2)
+	@(cd $(ROOT)/src/boot/$(ARCH) && $(MAKE) stage2)
 # FIXME: kernel depends on headers in stage2
 kernel: headers libc
-	@(cd $(ROOT)/src/kernel && env make kernel install)
+	@(cd $(ROOT)/src/kernel && $(MAKE) kernel install)
 libc: headers
-	@(cd $(ROOT)/src/libc && env make all install)
+	@(cd $(ROOT)/src/libc && $(MAKE) all install)
 
 
 # only used in GDB
@@ -93,7 +93,7 @@ $(ISO): mbr $(BOOTPART) $(EXTPART)
 	@echo "ISO	partition.sh"
 	@rm $(ISO) 2>/dev/null || echo jank >/dev/null
 	@./partition.sh -vfm "$(MBR)" "$(ISO)" \
-		"$(BOOTPART):13::y" "$(EXTPART):linux"
+		"$(BOOTPART):13::y" "$(EXTPART):linux::y"
 
 
 .PHONY: all clean dirs debug structs mbr stage1 stage2 kernel libc iso
