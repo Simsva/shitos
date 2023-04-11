@@ -10,6 +10,8 @@ extern idt_install
 extern irq_install
 extern isrs_install
 
+extern keyboard_init
+
 extern _kernel_lowtext_start
 extern _kernel_text_start
 extern _kernel_rodata_start
@@ -85,6 +87,8 @@ _highstart:
     call idt_install
     call irq_install
     call isrs_install
+     
+    call keyboard_init
 
     sti
 
