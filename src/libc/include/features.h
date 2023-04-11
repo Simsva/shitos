@@ -9,6 +9,14 @@
 #define __inline inline
 #endif
 
+#ifndef asm
+# define asm __asm__
+#endif
+
+#ifndef volatile
+# define volatile __volatile__
+#endif
+
 #if __STDC_VERSION__ >= 201112L
 #elif defined(__GNUC__)
 #define _Noreturn __attribute__((__noreturn__))

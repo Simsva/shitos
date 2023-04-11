@@ -1,14 +1,12 @@
 #include <kernel/tty/tm.h>
 #include <kernel/fs.h>
+#include <kernel/video.h>
 #include <kernel/args.h>
 #include <ext2fs/ext2.h>
 #include <stdio.h>
 #include <string.h>
 
 #include <kernel/arch/i386/ports.h>
-
-#include <kernel/kmem.h>
-#include <sys/stat.h>
 
 #define STR(s) #s
 #define EXPAND_STR(s) STR(s)
@@ -38,6 +36,7 @@ void kmain(struct kernel_args *args) {
 
     vfs_install();
     vfs_map_directory("/dev");
+    fb_init();
     console_install();
     zero_install();
     random_install();

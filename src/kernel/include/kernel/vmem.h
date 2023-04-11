@@ -24,6 +24,9 @@
 # define PAGE_FLAG_DIRTY    0
 #endif
 
+#define PAGE_PTR_FLAG_NULL  0x01
+#define PAGE_PTR_FLAG_WRITE 0x02
+
 #define VMEM_HEAP_MAGIC      0x0dedbeef
 #define VMEM_HEAP_INDEX_SZ   0x20000
 #define VMEM_HEAP_INITIAL_SZ 0x100000
@@ -51,6 +54,7 @@ void vmem_map(void *paddr, void *vaddr, uint8_t flags);
 void vmem_unmap(void *vaddr);
 void vmem_init(void);
 void vmem_alloc(void *vaddr, uint8_t flags);
+int vmem_validate_ptr(void *vaddr, size_t sz, uint8_t flags);
 
 void vmem_heap_create(vmem_heap_t *heap, void *start, void *end, void *max);
 void *vmem_heap_alloc(vmem_heap_t *heap, size_t size, uint8_t align);

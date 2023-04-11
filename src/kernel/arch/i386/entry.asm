@@ -26,9 +26,8 @@ extern kmem_head
 section .low.data
 
 _kernel_args:
-    dw 0                        ; tm_cursor
-    db 0                        ; boot_options
-    db 0                        ; drive_num
+    ;; XXX: this is manually changed to reflect the size of kernel args
+times 20 db 0
 
 section .low.text
 

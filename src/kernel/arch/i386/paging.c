@@ -1,10 +1,10 @@
 #include <kernel/arch/i386/paging.h>
 
 #include <kernel/kmem.h>
-#include <sys/utils.h>
 #include <strings.h>
 #include <string.h>
 #include <stdio.h>
+#include <features.h>
 #include <ansi.h>
 
 #include <kernel/arch/i386/idt.h>
@@ -67,9 +67,12 @@ void i386_map_page(void *paddr, void *vaddr, uint8_t flags) {
     uint32_t *pt = (uint32_t *)0xffc00000 + 0x400 * pdi;
 
     if(!(pd[pdi] & 0x1)) {
-        pd[pdi] = (uint32_t)buffer_pt | 0x1;
-        buffer_pt = NULL;
-        /* TODO: allocate a new buffer */
+        if(!buffer_pt) {
+            puts("\033[41mOut of memory!");
+            for(;;) asm volatile("hlt");
+        }
+        pd[pdi] = (uint32_t)i386_get_paddr(buffer_pt) | 0x1;
+        buffer_pt = kmalloc_a(I386_PAGE_SIZE);
     }
 
     if(pt[pti] & 0x1) {
@@ -81,7 +84,7 @@ void i386_map_page(void *paddr, void *vaddr, uint8_t flags) {
     frame_set((uint32_t)paddr);
     pt[pti] = (uint32_t)paddr | (flags & 0xfff) | 0x1;
 
-    asm("mov %%cr3, %%eax; mov %%eax, %%cr3" ::: "%eax");
+    asm volatile("mov %%cr3, %%eax; mov %%eax, %%cr3" ::: "%eax");
 }
 
 void i386_unmap_page(void *vaddr) {
@@ -102,13 +105,13 @@ void i386_unmap_page(void *vaddr) {
     pd[pdi] = 0;
 not_empty:
 
-    asm("mov %%cr3, %%eax; mov %%eax, %%cr3" ::: "%eax");
+    asm volatile("mov %%cr3, %%eax; mov %%eax, %%cr3" ::: "%eax");
 }
 
 /* fault */
 void _page_fault(struct int_regs *r) {
     void *loc;
-    asm("mov %%cr2, %0" : "=r"(loc));
+    asm volatile("mov %%cr2, %0" : "=r"(loc));
 
     printf(ANSI_FG_BRIGHT_WHITE ANSI_BG_RED "Page fault (%s%s%s%s%s) at %p\n",
            r->err_code & 0x1  ? ""          : "not present,",

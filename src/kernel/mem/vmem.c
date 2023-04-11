@@ -49,7 +49,7 @@ void vmem_init(void) {
 
 #if _ARCH == i386
     /* create initial buffer PT */
-    /* buffer_pt = kmalloc_a(0x1000); */
+    buffer_pt = kmalloc_a(PAGE_SIZE);
 #else
     puts("vmem_init not implemented for the current architecture");
 #endif
@@ -63,6 +63,39 @@ void vmem_alloc(void *vaddr, uint8_t flags) {
     i386_map_page((void *)(frame * PAGE_SIZE), vaddr, flags);
 #else
     puts("vmem_page_alloc not implemented for the current architecture");
+#endif
+}
+
+/**
+ * Check if a pointer is mapped in the current page directory.
+ */
+int vmem_validate_ptr(void *vaddr, size_t sz, uint8_t flags) {
+    if(vaddr == NULL && !(flags & PAGE_PTR_FLAG_NULL)) return 0;
+
+#if _ARCH == i386
+    uint32_t base = (uint32_t)vaddr;
+    uint32_t end = sz ? (base + sz-1) : base;
+
+    uint32_t page_base = base >> 12;
+    uint32_t page_end = end >> 12;
+
+    uint32_t *pd = (uint32_t *)0xfffff000;
+    for(uint32_t page = page_base; page <= page_end; page++) {
+        uint32_t pdi = page >> 10;
+        uint32_t pti = page & 0x3ff;
+        uint32_t *pt = (uint32_t *)0xffc00000 + 0x400*pdi;
+
+        if(!pd[pdi]) return 0;
+        if(!(pt[pti] & PAGE_FLAG_PRESENT)) return 0;
+        if(!(pt[pti] & PAGE_FLAG_KERNEL)) return 0;
+        if(!(pt[pti] & PAGE_FLAG_RW) && flags & PAGE_PTR_FLAG_WRITE)
+            return 0;
+    }
+
+    return 1;
+#else
+    puts("vmem_validate_ptr not implemented for the current architecture");
+    return 0;
 #endif
 }
 

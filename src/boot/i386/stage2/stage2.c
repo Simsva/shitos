@@ -348,6 +348,11 @@ found:
         .tm_cursor = tm_cursor,
         .boot_options = boot_options,
         .drive_num = drive_num,
+        .video_x = 0,
+        .video_y = 0,
+        .video_depth = 0,
+        .video_memory = 0xb8000,
+        .video_mode = VIDEO_TEXT,
     });
 
 halt:
