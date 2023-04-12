@@ -48,6 +48,10 @@ $(DIRS):
 	@mkdir -p $@
 
 
+share:
+	@echo "Installing shared data"
+	@mkdir -p $(SYSROOT)/usr/share
+	@cp -r $(ROOT)/share/* $(SYSROOT)/usr/share
 headers:
 	@(cd $(ROOT)/src/boot/$(ARCH) && $(MAKE) install_headers)
 	@(cd $(ROOT)/src/kernel && $(MAKE) install_headers)
@@ -88,7 +92,7 @@ debug: dirs structs
 
 
 # partition and combine to disk image
-iso: dirs $(ISO)
+iso: dirs share $(ISO)
 $(ISO): mbr $(BOOTPART) $(EXTPART)
 	@echo "ISO	partition.sh"
 	@rm $(ISO) 2>/dev/null || echo jank >/dev/null
@@ -96,4 +100,4 @@ $(ISO): mbr $(BOOTPART) $(EXTPART)
 		"$(BOOTPART):13::y" "$(EXTPART):linux::y"
 
 
-.PHONY: all clean dirs debug structs mbr stage1 stage2 kernel libc iso
+.PHONY: all clean dirs debug structs share headers mbr stage1 stage2 kernel libc iso
