@@ -97,7 +97,6 @@ struct vfs_entry {
 typedef fs_node_t *(*vfs_mount_t)(const char *, const char *);
 
 extern tree_t *fs_tree;
-extern fs_node_t *console_dev; /* TODO: move this */
 
 ssize_t fs_read(fs_node_t *node, off_t off, size_t sz, uint8_t *buf);
 ssize_t fs_write(fs_node_t *node, off_t off, size_t sz, uint8_t *buf);

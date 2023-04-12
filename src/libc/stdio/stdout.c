@@ -4,7 +4,7 @@
 #undef stdout
 
 #ifdef __is_libk
-#include <kernel/fs.h>
+#include <kernel/console.h>
 
 static size_t __stdout_write(__unused FILE *f, const unsigned char *s, size_t l) {
     return fs_write(console_dev, 0, l, (uint8_t *)s);

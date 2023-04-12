@@ -1,7 +1,12 @@
-#include <kernel/tty/tm.h>
+#include <kernel/tty.h>
+#include <kernel/console.h>
+#include <kernel/video.h>
+#include <kernel/args.h>
+#include <kernel/arch/i386/ports.h>
 
-#include <sys/utils.h>
 #include <string.h>
+#include <stddef.h>
+#include <stdint.h>
 
 #include "ansi_codes.h"
 
@@ -21,25 +26,36 @@
 #define TM_INVERT   0x01
 #define TM_CONCEAL  0x02
 
-static uint16_t *const tm_memory = (uint16_t *)0xe0000000;
-uint8_t tm_cur_x, tm_cur_y;
+#define LEN(a) (sizeof(a)/sizeof(a[0]))
+
+/* static uint16_t *const tm_memory = (uint16_t *)0xe0000000; */
+#define tm_memory ((uint16_t *)fb_vid_memory)
+static uint8_t tm_cur_x, tm_cur_y;
 static uint8_t tm_cur_saved_x = 0, tm_cur_saved_y = 0;
 static uint8_t tm_color = DEFAULT_COLOR, tm_esc_level = LEVEL_NONE;
 static uint8_t tm_options = 0;
 
-void tm_cursor_update(void);
-uint16_t tm_parse_dec_rev(const char *, uint8_t);
+static void tm_cursor_update(void);
+static void tm_putc(unsigned char c);
+static void tm_handle_esc(unsigned char c);
+static void tm_handle_csi(unsigned char c);
+static void tm_scroll(uint8_t lines);
+static void tm_clear(uint8_t mode);
+static void tm_clear_line(uint8_t mode);
+static void tm_sgr(uint8_t mode);
+static uint16_t tm_parse_dec_rev(const char *s, uint8_t i);
+static ssize_t tm_console_write(size_t sz, uint8_t *buf);
 
-void tm_cursor_update(void) {
+static void tm_cursor_update(void) {
     /* update blinking cursor */
     uint16_t tm_cursor = tm_cur_x + tm_cur_y*TM_WIDTH;
-    outb(0x03d4, 14);
-    outb(0x03d5, tm_cursor>>8);
-    outb(0x03d4, 15);
-    outb(0x03d5, tm_cursor & 0xff);
+    outportb(0x03d4, 14);
+    outportb(0x03d5, tm_cursor>>8);
+    outportb(0x03d4, 15);
+    outportb(0x03d5, tm_cursor & 0xff);
 }
 
-void tm_putc(unsigned char c) {
+static void tm_putc(unsigned char c) {
     switch(tm_esc_level) {
     case LEVEL_NONE: break;
     case LEVEL_ESC:  tm_handle_esc(c); return;
@@ -100,17 +116,17 @@ void tm_putc(unsigned char c) {
 }
 
 /* handle single-char escape sequences */
-void tm_handle_esc(unsigned char c) {
+static void tm_handle_esc(unsigned char c) {
     switch(c) {
     case Fe_CSI: tm_esc_level = LEVEL_CSI; break;
     case Fe_OSC: tm_esc_level = LEVEL_OSC; break;
     }
 }
 
-char tm_csi_buf[6];
-uint16_t tm_csi_args[2];
-uint8_t tm_csi_buf_i = 0, tm_csi_args_i = 0;
-void tm_handle_csi(unsigned char c) {
+static char tm_csi_buf[6];
+static uint16_t tm_csi_args[2];
+static uint8_t tm_csi_buf_i = 0, tm_csi_args_i = 0;
+static void tm_handle_csi(unsigned char c) {
     uint8_t b;
 
     if(c >= '0' && c <= '9') {
@@ -201,14 +217,14 @@ void tm_handle_csi(unsigned char c) {
     tm_esc_level = LEVEL_NONE;
 }
 
-void tm_scroll(uint8_t lines) {
+static void tm_scroll(uint8_t lines) {
     memcpy((uint16_t *)tm_memory, (uint16_t *)tm_memory + lines*TM_WIDTH,
            (TM_HEIGHT-lines)*TM_WIDTH*sizeof(tm_memory[0]));
     memset((uint16_t *)tm_memory + (TM_HEIGHT-lines)*TM_WIDTH, 0,
            lines*TM_WIDTH*sizeof(tm_memory[0]));
 }
 
-void tm_clear(uint8_t mode) {
+static void tm_clear(uint8_t mode) {
     switch(mode) {
     case 0:
         /* clear cursor down */
@@ -232,7 +248,7 @@ void tm_clear(uint8_t mode) {
     }
 }
 
-void tm_clear_line(uint8_t mode) {
+static void tm_clear_line(uint8_t mode) {
     switch(mode) {
     case 0:
         /* clear cursor right */
@@ -254,8 +270,8 @@ void tm_clear_line(uint8_t mode) {
     }
 }
 
-uint8_t tm_sgr_to_vga[8] = { 0, 4, 2, 6, 1, 5, 3, 7 };
-void tm_sgr(uint8_t mode) {
+static const uint8_t tm_sgr_to_vga[8] = { 0, 4, 2, 6, 1, 5, 3, 7 };
+static void tm_sgr(uint8_t mode) {
     if(mode >= SGR_FG_COLOR_FIRST && mode <= SGR_FG_COLOR_LAST) {
         tm_color &= 0xf0;
         tm_color |= tm_sgr_to_vga[mode - SGR_FG_COLOR_FIRST];
@@ -306,7 +322,7 @@ void tm_sgr(uint8_t mode) {
     }
 }
 
-uint16_t tm_parse_dec_rev(const char *s, uint8_t i) {
+static uint16_t tm_parse_dec_rev(const char *s, uint8_t i) {
     uint16_t prod = 1, out = 0;
     char c;
     while(i) {
@@ -315,4 +331,17 @@ uint16_t tm_parse_dec_rev(const char *s, uint8_t i) {
         prod *= 10;
     }
     return out;
+}
+
+static ssize_t tm_console_write(size_t sz, uint8_t *buf) {
+    size_t i;
+    for(i = 0; i < sz; i++) tm_putc(*buf++);
+    return i;
+}
+
+void tm_term_install(void) {
+    tm_cur_x = kernel_args.tm_cursor % 80;
+    tm_cur_y = kernel_args.tm_cursor / 80;
+
+    console_set_output(tm_console_write);
 }

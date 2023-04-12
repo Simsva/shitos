@@ -28,6 +28,16 @@
 #define OPT_FMT(x)    ((x) ? OPT_COLOR_ON : OPT_COLOR_OFF),\
                       ((x) ? menu_opt_on  : menu_opt_off)
 
+/* video modes */
+enum video_opt {
+OPT_VIDEO_TEXT,
+OPT_VIDEO_QEMU,
+N_OPT_VIDEO,
+};
+/* TODO: auto-mode? */
+#define VIDEO_OPT_DEFAULT OPT_VIDEO_QEMU
+const char *opt_video_str[N_OPT_VIDEO] = { "text", "qemu", };
+
 /* timer */
 #define TPS              18    /* 18.222 ~= 18 */
 #define AUTOBOOT_TIMEOUT 10
@@ -52,6 +62,7 @@ void *global_esp;
 uint32_t ticks = 0;
 uint8_t menu_current = 0; /* 0 for main, 1 for options */
 uint8_t boot_options = BOOT_OPTS_DEFAULT;
+enum video_opt video_opt = VIDEO_OPT_DEFAULT;
 uint8_t autoboot = 1, /* set to 0 to stop autoboot */
         booting = 0;  /* is currently booting */
 
@@ -92,7 +103,8 @@ const char *menu_opt_on = "ON",
 1. Back to main menu %H0f[Backspace]%H07\n\
 2. Load System %H0fD%H07efaults\n\n\n\
 Boot Options:\n\
-3. %H0fV%H07erbose: %h%s";
+3. %H0fV%H07erbose: %h%s%H07\n\
+4. %H0fG%H07raphics: %s";
 
 void draw_menu_skeleton(void) {
     /* draw FIGlet name */
@@ -152,7 +164,8 @@ void draw_menu_opts(void) {
     tm_line_reset = MENU_BOX_X+3;
     tm_color = 0x07;
     tm_printf(menu_opts,
-              OPT_FMT(HAS_OPT(BOOT_OPT_VERBOSE)));
+              OPT_FMT(HAS_OPT(BOOT_OPT_VERBOSE)),
+              opt_video_str[video_opt]);
 
     tm_cursor_set(0, 24);
     tm_color = 0x07;
@@ -217,11 +230,17 @@ void kb_handler(__attribute__((unused)) struct int_regs *r) {
         /* Load System Defaults */
         case SCAN1_2: case SCAN1_D:
             boot_options = BOOT_OPTS_DEFAULT;
+            video_opt = VIDEO_OPT_DEFAULT;
             break;
 
         /* Boot Options: Verbose */
         case SCAN1_3: case SCAN1_V:
             boot_options ^= BOOT_OPT_VERBOSE;
+            break;
+
+        /* Boot Options: Graphics Mode */
+        case SCAN1_4: case SCAN1_G:
+            video_opt = (video_opt + 1) % N_OPT_VIDEO;
             break;
         }
     }
@@ -344,16 +363,18 @@ found:
     kernel_entry = (void *)elf_hdr->e_entry;
 
     /* call kmain with a known environment */
-    call_kernel(kernel_entry, sizeof(struct kernel_args), (struct kernel_args){
+    struct kernel_args args = {
         .tm_cursor = tm_cursor,
         .boot_options = boot_options,
         .drive_num = drive_num,
-        .video_x = 0,
+        .video_x = 0,   /* TODO: be able to change this maybe? */
         .video_y = 0,
         .video_depth = 0,
-        .video_memory = 0xb8000,
-        .video_mode = VIDEO_TEXT,
-    });
+        .video_memory = 0,
+        .video_mode = video_opt == OPT_VIDEO_QEMU ? VIDEO_QEMU : VIDEO_TEXT,
+    };
+
+    call_kernel(kernel_entry, sizeof args, args);
 
 halt:
     for(;;) asm("hlt");

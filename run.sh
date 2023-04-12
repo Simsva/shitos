@@ -19,7 +19,7 @@ DESCRIPTION
     -D    start debugging mode withouut connecting with gdb
     -h    print this help message"
 
-qemu_args="-drive format=raw,file=shitos.iso"
+qemu_args="-vga std -drive format=raw,file=shitos.iso"
 gdb_args="-x gdb/run.gdb"
 
 # Arguments

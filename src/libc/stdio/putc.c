@@ -1,7 +1,7 @@
 #include <stdio.h>
 
 #ifdef __is_libk
-# include <kernel/fs.h>
+# include <kernel/console.h>
 #endif
 
 int putc(int ic, __unused FILE *f) {

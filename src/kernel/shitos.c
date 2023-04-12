@@ -1,5 +1,6 @@
-#include <kernel/tty/tm.h>
+#include <kernel/tty.h>
 #include <kernel/fs.h>
+#include <kernel/console.h>
 #include <kernel/video.h>
 #include <kernel/args.h>
 #include <ext2fs/ext2.h>
@@ -30,14 +31,16 @@ static void tree_print_fs(tree_item_t item) {
 }
 
 void kmain(struct kernel_args *args) {
-    tm_cur_x = args->tm_cursor % 80;
-    tm_cur_y = args->tm_cursor / 80;
     memcpy(&kernel_args, args, sizeof kernel_args);
 
     vfs_install();
     vfs_map_directory("/dev");
-    fb_init();
     console_install();
+    fb_init();
+    if(kernel_args.video_mode == VIDEO_TEXT)
+        tm_term_install();
+    else
+        fb_term_install();
     zero_install();
     random_install();
     ps2hid_install();
