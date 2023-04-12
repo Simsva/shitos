@@ -8,6 +8,7 @@
 #include <kernel/arch/i386/ports.h>
 
 #include <kernel/kmem.h>
+#include <kernel/pipe.h>
 #include <sys/stat.h>
 
 #define STR(s) #s
@@ -56,6 +57,17 @@ void kmain(struct kernel_args *args) {
 
     printf("fs_tree:\n");
     tree_debug_dump(fs_tree, tree_print_fs);
+
+/*     fs_node_t *kbd = kopen("/dev/kbd", 0); */
+/*     for(;;) { */
+/*         size_t sz = pipe_size(kbd); */
+/*         if(sz > 0) { */
+/*             uint8_t c[sz+1]; */
+/*             fs_read(kbd, 0, sz, c); */
+/*             c[sz] = '\0'; */
+/*             printf("%s", c); */
+/*         } */
+/*     } */
 
     for(;;) asm volatile("hlt");
 }

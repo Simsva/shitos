@@ -7,6 +7,7 @@ extern fs_node_t *kbd_pipe;
 
 static const char *us_keymap[][256] = {
     { /* bare */
+        [KEY_1] = "1",
         [KEY_A] = "a",
         [KEY_B] = "b",
         [KEY_C] = "c",
@@ -33,7 +34,7 @@ static const char *us_keymap[][256] = {
         [KEY_X] = "x",
         [KEY_Y] = "y",
         [KEY_Z] = "z",
-        [KEY_UP] = "\033[A",
+        [KEY_UP] = "abc", // "\033[A",
         [KEY_DOWN] = "\033[B",
         [KEY_RIGHT] = "\033[C",
         [KEY_LEFT] = "\033[D",
@@ -48,16 +49,12 @@ static const char *us_keymap[][256] = {
 };
 
 void handle_kb_input(struct kb_packet keypress) {
-    /* 
-    TODO:
-       Convert key code to ascii
-       Check release flag
-       Check mod
-
-    */
     
-    printf("%s keycodes", us_keymap[0][keypress.keycode]);
+    /* todo:
+        * key to ascii 
+    */
+    printf("%x %d\n", keypress.keycode, keypress.release_flag);//us_keymap[0][keypress.keycode]);
 
-    fs_write(kbd_pipe, 0, 1, "c");
+    //fs_write(kbd_pipe, 0, 1, "c");
 }
 

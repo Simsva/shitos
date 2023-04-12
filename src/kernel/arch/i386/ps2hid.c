@@ -30,22 +30,101 @@
 
 #define BIT(n) (1<<(n))
 
-uint8_t sc_to_usb[128] =
-{
-    0,  KEY_ESC, KEY_1, KEY_2, KEY_3, KEY_4, KEY_5, KEY_6, KEY_7, KEY_8, KEY_9,
-    KEY_0, KEY_MINUS, KEY_EQUAL, KEY_BACKSPACE, KEY_TAB, KEY_Q, KEY_W, KEY_E,
-    KEY_R, KEY_T, KEY_Y, KEY_U, KEY_I, KEY_O, KEY_P, KEY_LEFTBRACE,
-    KEY_RIGHTBRACE, KEY_ENTER, KEY_LEFTCTRL, KEY_A, KEY_S, KEY_D, KEY_F, KEY_G,
-    KEY_H, KEY_J, KEY_K, KEY_L, KEY_SEMICOLON, KEY_APOSTROPHE, KEY_GRAVE,
-    KEY_LEFTSHIFT, KEY_BACKSLASH, KEY_Z, KEY_X, KEY_C, KEY_V, KEY_B, KEY_N,
-    KEY_M, KEY_COMMA, KEY_DOT, KEY_SLASH, KEY_RIGHTSHIFT, '*', KEY_LEFTALT,
-    KEY_SPACE, KEY_CAPSLOCK, KEY_F1, KEY_F2, KEY_F3, KEY_F4, KEY_F5, KEY_F6,
-    KEY_F7, KEY_F8, KEY_F9, KEY_F10, KEY_NUMLOCK, KEY_SCROLLLOCK, KEY_KP7,
-    KEY_KP8, KEY_KP8, KEY_KP9, KEY_KPMINUS, KEY_KP4, KEY_KP5, KEY_KP6,
-    KEY_KPPLUS, KEY_KP1, KEY_KP2, KEY_KP3, KEY_KP0, KEY_KPDOT,   0,   0, 0,
-    KEY_F11, KEY_F12,
+uint8_t sc3[] = {
+    [0x08] = KEY_ESC,
+    [0x16] = KEY_1,
+    [0x1E] = KEY_2,
+    [0x26] = KEY_3,
+    [0x25] = KEY_4,
+    [0x2E] = KEY_5,
+    [0x36] = KEY_6,
+    [0x3D] = KEY_7,
+    [0x3E] = KEY_8,
+    [0x46] = KEY_9,
+    [0x45] = KEY_0,
+    [0x4E] = KEY_MINUS,
+    [0x55] = KEY_EQUAL,
+    [0x66] = KEY_BACKSPACE,
+    [0x0D] = KEY_TAB,
+    [0x15] = KEY_Q,
+    [0x1D] = KEY_W,
+    [0x24] = KEY_E,
+    [0x2D] = KEY_R,
+    [0x2C] = KEY_T,
+    [0x35] = KEY_Y,
+    [0x3C] = KEY_U,
+    [0x48] = KEY_I,
+    [0x44] = KEY_O,
+    [0x4D] = KEY_P,
+    [0x54] = KEY_LEFTBRACE,
+    [0x5B] = KEY_RIGHTBRACE,
+    [0x5A] = KEY_ENTER,
+    [0x11] = KEY_LEFTCTRL,
+    [0x1C] = KEY_A,
+    [0x1B] = KEY_S,
+    [0x23] = KEY_D,
+    [0x2B] = KEY_F,
+    [0x34] = KEY_G,
+    [0x33] = KEY_H,
+    [0x3B] = KEY_J,
+    [0x42] = KEY_K,
+    [0x4B] = KEY_L,
+    [0x4C] = KEY_SEMICOLON,
+    [0x52] = KEY_APOSTROPHE,
+    [0x0E] = KEY_GRAVE,
+    [0x12] = KEY_LEFTSHIFT,
+    [0x5C] = KEY_BACKSLASH,
+    [0x1A] = KEY_Z,
+    [0x22] = KEY_X,
+    [0x21] = KEY_C,
+    [0x2A] = KEY_V,
+    [0x32] = KEY_B,
+    [0x31] = KEY_N,
+    [0x3A] = KEY_M,
+    [0x41] = KEY_COMMA,
+    [0x49] = KEY_DOT,
+    [0x4A] = KEY_SLASH,
+    [0x59] = KEY_RIGHTSHIFT,
+    //[] = '*',
+    [0x19] = KEY_LEFTALT,
+    [0x29] = KEY_SPACE,
+    [0x14] = KEY_CAPSLOCK,
+    [0x07] = KEY_F1,
+    [0x0F] = KEY_F2,
+    [0x17] = KEY_F3,
+    [0x1F] = KEY_F4,
+    [0x27] = KEY_F5,
+    [0x2F] = KEY_F6,
+    [0x37] = KEY_F7,
+    [0x3F] = KEY_F8,
+    [0x47] = KEY_F9,
+    [0x4F] = KEY_F10,
+    [0x76] = KEY_NUMLOCK,
+    [0x5F] = KEY_SCROLLLOCK,
+    [0x6C] = KEY_KP7,
+    [0x75] = KEY_KP8,
+    [0x7D] = KEY_KP9,
+    [0x4E] = KEY_KPMINUS,
+    [0x6B] = KEY_KP4,
+    [0x73] = KEY_KP5,
+    [0x74] = KEY_KP6,
+    [0x7C] = KEY_KPPLUS,
+    [0x69] = KEY_KP1,
+    [0x72] = KEY_KP2,
+    [0x7A] = KEY_KP3,
+    [0x70] = KEY_KP0,
+    [0x71] = KEY_KPDOT,
+    [0x56] = KEY_F11,
+    [0x5E] = KEY_F12,
+    [0x6A] = KEY_RIGHT,
+    [0x61] = KEY_LEFT,
+    [0x60] = KEY_DOWN,
+    [0x63] = KEY_UP,
 };
+
 static uint8_t mod = 0;
+// 1 means not released
+static uint8_t released = 1;
 
 fs_node_t *kbd_pipe = NULL;
 
@@ -91,28 +170,21 @@ static inline uint8_t kbd_write(uint8_t byte) {
 static void kbd_handler(__unused struct int_regs *r) {
     /* Read from keyboard buffer */
     uint8_t scancode = inportb(PS2_DATA);
-    
-    /* char input_value = sc_to_usb[scancode]; */ 
-    uint8_t extension = 0;
-    
-    // Handle extension bytes
-    switch(scancode) {
-        case 0xE0:
-            extension = 1;
-            break;
-        case 0xF0:
-            extension = 1;
-            break;
+    if (scancode == 0xF0) {
+        //printf("test");
+        released = 0;
     }
-   if (!extension) {
+    else {    
         struct kb_packet key_press = {
-            .keycode = sc_to_usb[scancode & ~0x80],
+            .keycode = sc3[scancode],
             .mod = mod,
-            .release_flag = scancode & 0x80
+            .release_flag = released, 
         };
 
-        handle_kb_input(key_press);
-    }    
+        handle_kb_input(key_press);    
+        released = 1;
+    }
+
 }
 
 void ps2hid_install(void) {
@@ -154,3 +226,5 @@ void ps2hid_install(void) {
     /* install IRQ handlers */
     irq_handler_install(KEYBOARD_IRQ, kbd_handler);
 }
+
+
