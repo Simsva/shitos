@@ -13,7 +13,8 @@
 #define TM_WIDTH  (80)
 #define TM_HEIGHT (25)
 
-#define DEFAULT_COLOR 0x07 /* in ANSI/SGR format */
+#define DEFAULT_COLOR_FG 0x7 /* in ANSI/SGR format */
+#define DEFAULT_COLOR_BG 0x0
 
 #define tm_memory ((uint16_t *)fb_vid_memory)
 static ansi_ctx_t ansi_ctx;
@@ -23,7 +24,7 @@ static void tm_cursor_update(ansi_ctx_t *ctx);
 static void tm_scroll(ansi_ctx_t *ctx, uint8_t lines);
 static void tm_clear(ansi_ctx_t *ctx, uint8_t mode);
 static void tm_clear_line(ansi_ctx_t *ctx, uint8_t mode);
-static uint8_t tm_from_ansi_color(uint8_t color4);
+static uint8_t tm_from_ansi_color(uint8_t fg, uint8_t bg);
 static void tm_ansi_callback(ansi_ctx_t *ctx, enum ansi_out type, uint32_t uc);
 static ssize_t tm_console_write(size_t sz, uint8_t *buf);
 
@@ -89,10 +90,7 @@ static void tm_clear_line(ansi_ctx_t *ctx, uint8_t mode) {
     }
 }
 
-static uint8_t tm_from_ansi_color(uint8_t color4) {
-    uint8_t fg = color4 & 0x0f,
-            bg = (color4 & 0xf0) >> 4;
-
+static uint8_t tm_from_ansi_color(uint8_t fg, uint8_t bg) {
     return ((fg < 8) ? (tm_sgr_to_vga[fg]) : (tm_sgr_to_vga[fg - 8] + 8))
          | ((bg < 8) ? (tm_sgr_to_vga[bg]) : (tm_sgr_to_vga[bg - 8] + 8)) << 4;
 }
@@ -114,14 +112,13 @@ static void tm_ansi_callback(ansi_ctx_t *ctx, enum ansi_out type, uint32_t uc) {
             return;
         }
 
-        uint8_t real_color = ctx->color4;
+        uint8_t real_color = tm_from_ansi_color(ctx->color_fg, ctx->color_bg);
         if(ctx->text_mode & ANSI_MODE_INVERT)
             real_color = (real_color>>4) | (real_color<<4);
         if(ctx->text_mode & ANSI_MODE_CONCEAL)
             real_color = (real_color&0xf0) | ((real_color&0xf0)>>4);
 
-        tm_memory[ctx->cur_x + ctx->cur_y*ctx->width]
-            = tm_from_ansi_color(real_color)<<8 | c;
+        tm_memory[ctx->cur_x + ctx->cur_y*ctx->width] = real_color<<8 | c;
         ctx->cur_x++;
     } else if(type == ANSI_OUT_ESC) {
         switch(uc) {
@@ -147,7 +144,8 @@ static ssize_t tm_console_write(size_t sz, uint8_t *buf) {
 }
 
 void tm_term_install(void) {
-    ansi_init(&ansi_ctx, TM_WIDTH, TM_HEIGHT, DEFAULT_COLOR, tm_ansi_callback);
+    ansi_init(&ansi_ctx, TM_WIDTH, TM_HEIGHT, 0,
+              DEFAULT_COLOR_FG, DEFAULT_COLOR_BG, tm_ansi_callback);
     ansi_ctx.cur_x = kernel_args.tm_cursor % TM_WIDTH;
     ansi_ctx.cur_y = kernel_args.tm_cursor / TM_WIDTH;
 

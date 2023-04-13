@@ -49,22 +49,12 @@ struct ansi_ctx {
     char arg_buf[6];                 /* internal argument buffer */
     uint8_t arg_buf_i;               /* internal argument buffer index */
     uint16_t text_mode;              /* ANSI_MODE_* */
-    uint8_t color4_default;          /* default color */
-    union {
-        uint8_t color4;              /* 4-bit color, bg<<4 | fg */
-        struct {
-            uint8_t color4_fg : 4;
-            uint8_t color4_bg : 4;
-        };
-    };
-    uint8_t color8_fg, color8_bg;    /* 8-bit ANSI colors */
-    uint32_t color24_fg, color24_bg; /* 24-bit color, 0x00RRGGBB */
-    struct {
-        uint8_t last_color_fg : 4;   /* 0 for 4-bit, 1 for 8-bit, 2 for 24-bit */
-        uint8_t last_color_bg : 4;
-    };
+    uint32_t color_fg, color_bg;     /* text color */
+    uint32_t color_def_fg,
+             color_def_bg;           /* default text color */
+    uint8_t color_fmt;               /* 0 for 4-bit, 2 for 24-bit */
     uint8_t esc_level;               /* current escape mode */
-    uint16_t width, height;          /* set by user */
+    uint16_t width, height;          /* terminal dimensions */
     uint16_t cur_x, cur_y;           /* cursor position (zero-indexed) */
     uint16_t scur_x, scur_y;         /* saved cursor position */
 };
@@ -72,7 +62,8 @@ struct ansi_ctx {
 void tm_term_install(void);
 void fb_term_install(const char *font_path);
 
-void ansi_init(ansi_ctx_t *ctx, uint16_t w, uint16_t h, uint8_t color4_default,
+void ansi_init(ansi_ctx_t *ctx, uint16_t w, uint16_t h, uint32_t color_fmt,
+               uint32_t color_def_fg, uint32_t color_def_bg,
                ansi_callback_t callback);
 void ansi_handle(ansi_ctx_t *ctx, uint32_t c);
 

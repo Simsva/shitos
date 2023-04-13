@@ -13,18 +13,28 @@
 #define LEN(a) (sizeof(a)/sizeof(a[0]))
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 
+static const uint32_t color4_to_24[] = {
+    0x00000000, 0x00aa0000, 0x0000aa00, 0x00aa5500,
+    0x000000aa, 0x00aa00aa, 0x0000aaaa, 0x00aaaaaa,
+    0x00555555, 0x00ff5555, 0x0055ff55, 0x00ffff55,
+    0x005555ff, 0x00ff55ff, 0x0055ffff, 0x00ffffff,
+};
+
 static void ansi_handle_esc(ansi_ctx_t *ctx, uint32_t c);
 static void ansi_handle_csi(ansi_ctx_t *ctx, uint32_t c);
 static void ansi_sgr(ansi_ctx_t *ctx);
 static void ansi_check_cursor(ansi_ctx_t *ctx);
 static uint16_t ansi_parse_dec_rev(const char *s, uint8_t i);
+static uint32_t ansi_color8_to_24(uint8_t c);
 
-void ansi_init(ansi_ctx_t *ctx, uint16_t w, uint16_t h, uint8_t color4_default,
+void ansi_init(ansi_ctx_t *ctx, uint16_t w, uint16_t h, uint32_t color_fmt,
+               uint32_t color_def_fg, uint32_t color_def_bg,
                ansi_callback_t callback) {
     ctx->callback = callback;
     ctx->text_mode = 0;
-    ctx->color4 = ctx->color4_default = color4_default;
-    ctx->last_color_fg = ctx->last_color_bg = 0;
+    ctx->color_fg = ctx->color_def_fg = color_def_fg;
+    ctx->color_bg = ctx->color_def_bg = color_def_bg;
+    ctx->color_fmt = color_fmt;
     ctx->esc_level = LEVEL_NONE;
     ctx->width = w;
     ctx->height = h;
@@ -189,34 +199,34 @@ static void ansi_sgr(ansi_ctx_t *ctx) {
     uint8_t mode = ctx->args_sz == 0 ? 0 : ctx->args[0];
 
     if(mode >= SGR_FG_COLOR_FIRST && mode <= SGR_FG_COLOR_LAST) {
-        ctx->color4 &= 0xf0;
-        ctx->color4 |= mode - SGR_FG_COLOR_FIRST;
-        ctx->last_color_fg = 0;
+        ctx->color_fg = ctx->color_fmt == 0
+                ? (uint32_t)mode - SGR_FG_COLOR_FIRST
+                : color4_to_24[mode - SGR_FG_COLOR_FIRST];
         return;
     }
     if(mode >= SGR_BG_COLOR_FIRST && mode <= SGR_BG_COLOR_LAST) {
-        ctx->color4 &= 0x0f;
-        ctx->color4 |= (mode - SGR_BG_COLOR_FIRST) << 4;
-        ctx->last_color_bg = 0;
+        ctx->color_bg = ctx->color_fmt == 0
+                ? (uint32_t)mode - SGR_BG_COLOR_FIRST
+                : color4_to_24[mode - SGR_BG_COLOR_FIRST];
         return;
     }
     if(mode >= SGR_FG_COLOR_BRIGHT_FIRST && mode <= SGR_FG_COLOR_BRIGHT_LAST) {
-        ctx->color4 &= 0xf0;
-        ctx->color4 |= mode - SGR_FG_COLOR_BRIGHT_FIRST + 8;
-        ctx->last_color_fg = 0;
+        ctx->color_fg = ctx->color_fmt == 0
+                ? (uint32_t)mode - SGR_FG_COLOR_BRIGHT_FIRST + 8
+                : color4_to_24[mode - SGR_FG_COLOR_BRIGHT_FIRST + 8];
         return;
     }
     if(mode >= SGR_BG_COLOR_BRIGHT_FIRST && mode <= SGR_BG_COLOR_BRIGHT_LAST) {
-        ctx->color4 &= 0x0f;
-        ctx->color4 |= (mode - SGR_BG_COLOR_BRIGHT_FIRST + 8) << 4;
-        ctx->last_color_bg = 0;
+        ctx->color_bg = ctx->color_fmt == 0
+                ? (uint32_t)mode - SGR_BG_COLOR_BRIGHT_FIRST + 8
+                : color4_to_24[mode - SGR_BG_COLOR_BRIGHT_FIRST + 8];
         return;
     }
 
     switch(mode) {
     case SGR_RESET:
-        ctx->color4 = ctx->color4_default;
-        ctx->last_color_fg = ctx->last_color_bg = 0;
+        ctx->color_fg = ctx->color_def_fg;
+        ctx->color_bg = ctx->color_def_bg;
         ctx->text_mode = 0;
         break;
 
@@ -263,41 +273,33 @@ static void ansi_sgr(ansi_ctx_t *ctx) {
         ctx->text_mode &= ~(ANSI_MODE_SUPERSCRIPT|ANSI_MODE_SUBSCRIPT); break;
 
     case SGR_FG_COLOR_DEFAULT:
-        ctx->color4 = (ctx->color4&0xf0) | (ctx->color4_default&0x0f);
-        ctx->last_color_fg = 0;
+        ctx->color_fg = ctx->color_def_fg;
         break;
     case SGR_BG_COLOR_DEFAULT:
-        ctx->color4 = (ctx->color4&0x0f) | (ctx->color4_default&0xf0);
-        ctx->last_color_bg = 0;
+        ctx->color_bg = ctx->color_def_bg;
         break;
 
     case SGR_FG_COLOR_SET_8BIT:
-        if(ctx->args_sz < 3) break;
-        if(ctx->args[1] == 5) {
+        if(ctx->color_fmt == 0 || ctx->args_sz < 3) break;
+        if(ctx->args[1] == 5)
             /* 8-bit color */
-            ctx->color8_fg = ctx->args[2];
-            ctx->last_color_fg = 1;
-        } else if(ctx->args[1] == 2 && ctx->args_sz >= 5) {
+            ctx->color_fg = ansi_color8_to_24(ctx->args[2]);
+        else if(ctx->args[1] == 2 && ctx->args_sz >= 5)
             /* 24-bit color */
-            ctx->color24_fg = ((uint32_t)ctx->args[2] & 0xff) << 16
-                            | ((uint32_t)ctx->args[3] & 0xff) << 8
-                            | ((uint32_t)ctx->args[4] & 0xff);
-            ctx->last_color_fg = 2;
-        }
+            ctx->color_fg = ((uint32_t)ctx->args[2] & 0xff) << 16
+                          | ((uint32_t)ctx->args[3] & 0xff) << 8
+                          | ((uint32_t)ctx->args[4] & 0xff);
         break;
     case SGR_BG_COLOR_SET_8BIT:
-        if(ctx->args_sz < 3) break;
-        if(ctx->args[1] == 5) {
+        if(ctx->color_fmt == 0 || ctx->args_sz < 3) break;
+        if(ctx->args[1] == 5)
             /* 8-bit color */
-            ctx->color8_bg = ctx->args[2];
-            ctx->last_color_bg = 1;
-        } else if(ctx->args[1] == 2 && ctx->args_sz >= 5) {
+            ctx->color_bg = ansi_color8_to_24(ctx->args[2]);
+        else if(ctx->args[1] == 2 && ctx->args_sz >= 5)
             /* 24-bit color */
-            ctx->color24_bg = ((uint32_t)ctx->args[2] & 0xff) << 16
-                            | ((uint32_t)ctx->args[3] & 0xff) << 8
-                            | ((uint32_t)ctx->args[4] & 0xff);
-            ctx->last_color_bg = 2;
-        }
+            ctx->color_bg = ((uint32_t)ctx->args[2] & 0xff) << 16
+                          | ((uint32_t)ctx->args[3] & 0xff) << 8
+                          | ((uint32_t)ctx->args[4] & 0xff);
         break;
     }
 }
@@ -321,4 +323,26 @@ static uint16_t ansi_parse_dec_rev(const char *s, uint8_t i) {
         prod *= 10;
     }
     return out;
+}
+
+static uint32_t ansi_color8_to_24(uint8_t c) {
+    if(c < 16) return color4_to_24[c];
+    uint8_t r, g, b;
+
+    /* grayscale */
+    if(c > 231) r = g = b = ((c - 232)*0xff)/23;
+    else {
+        /* color cube */
+        /* c = 16 + 36*r + 6*g + b, 0 <= r, g, b <= 5 */
+        c -= 16;
+        r = c / 36;
+        c -= 36 * r;
+        g = c / 6;
+        c -= 6 * g;
+        b = c;
+
+        r *= 51; g *= 51; b *= 51;
+    }
+
+    return (uint32_t)r << 16 | (uint32_t)g << 8 | (uint32_t)b;
 }
