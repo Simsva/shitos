@@ -35,4 +35,10 @@
 #define __unused
 #endif
 
+#ifdef __GNUC__
+#define __fallthrough __attribute__((fallthrough))
+#else
+#define __fallthrough
+#endif
+
 #endif // FEATURES_H_

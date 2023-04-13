@@ -149,13 +149,20 @@ void *psf_get_bitmap(psf_file_t *psf, uint16_t glyph) {
     case 1:
         {
             psf1_hdr_t *hdr = (void *)psf->file;
-            return (void *)hdr + sizeof *hdr + glyph*hdr->char_sz;
+            void *out = (void *)hdr + sizeof *hdr + glyph*hdr->char_sz;
+            size_t glyph_sz = (hdr->font_mode & PSF1_MODE512 ? 512 : 256)
+                            * hdr->char_sz;
+            return (uintptr_t)out < (uintptr_t)hdr + sizeof *hdr + glyph_sz
+                ? out
+                : NULL;
         }
 
     case 2:
         {
             psf2_hdr_t *hdr = (void *)psf->file;
-            return (void *)hdr + hdr->hdr_sz + glyph*hdr->glyph_sz;
+            return glyph < hdr->num_glyphs
+                ? (void *)hdr + hdr->hdr_sz + glyph*hdr->glyph_sz
+                : NULL;
         }
     }
 

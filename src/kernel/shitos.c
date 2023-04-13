@@ -32,37 +32,6 @@ static void tree_print_fs(tree_item_t item) {
     putchar('\n');
 }
 
-static uint16_t utf8_to_utf16(char *s) {
-    uint16_t uc = s[0];
-    if(uc & 0x80) {
-        /* UTF-8 to UTF-16 */
-        if((uc & 0x20) == 0) {
-            uc = ((s[0] & 0x1f) << 6) + (s[1] & 0x3f);
-        } else if((uc & 0x10) == 0) {
-            uc = ((((s[0] & 0xf) << 6) + (s[1] & 0x3f)) << 6)
-                    + (s[2] & 0x3f);
-        } else if((uc & 0x8) == 0) {
-            uc = ((((((s[0] & 0x7) << 6) + (s[1] & 0x3f)) << 6)
-                    + (s[2] & 0x3f)) << 6) + (s[3] & 0x3f);
-        } else
-            uc = 0;
-    }
-    return uc;
-}
-
-static void print_utf16(psf_file_t *psf, char *s) {
-    psf2_hdr_t *hdr = (void *)psf->file;
-    uint16_t c = utf8_to_utf16(s);
-    void *glyph_bm = psf_get_bitmap(psf, psf_get_glyph_unicode(psf, c));
-
-    for(uint8_t i = 0; i < hdr->height; i++) {
-        uint8_t row = ((uint8_t *)glyph_bm)[i];
-        for(uint8_t j = 0; j < 8; j++, row <<= 1)
-            printf("%c", row & 0x80 ? '#' : ' ');
-        printf("\n");
-    }
-}
-
 void kmain(struct kernel_args *args) {
     memcpy(&kernel_args, args, sizeof kernel_args);
 
@@ -92,13 +61,17 @@ void kmain(struct kernel_args *args) {
     printf("fs_tree:\n");
     tree_debug_dump(fs_tree, tree_print_fs);
 
-    psf_file_t *psf = psf_open("/usr/share/consolefonts/default8x16.psfu");
-    psf_generate_utf16_map(psf);
+    int i, j, n;
+    for(i = 0; i < 11; i++) {
+        for(j = 0; j < 10; j++) {
+            n = 10 * i + j;
+            if(n > 108) break;
+            printf("\033[%dm %3d\033[m", n, n);
+        }
+        printf("\n");
+    }
 
-    print_utf16(psf, "ß");
-    print_utf16(psf, "å");
-
-    psf_free(psf);
+    printf("\033[38;5;128m\033[48;2;1;2;3m");
 
     for(;;) asm volatile("hlt");
 }
