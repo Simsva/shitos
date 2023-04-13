@@ -168,3 +168,36 @@ void *psf_get_bitmap(psf_file_t *psf, uint16_t glyph) {
 
     return NULL;
 }
+
+/**
+ * Get the width of a glyph
+ */
+uint32_t psf_get_width(psf_file_t *psf) {
+    switch(psf->version) {
+    case 1: return 8;
+    case 2: return ((psf2_hdr_t *)psf->file)->width;
+    }
+    return 0;
+}
+
+/**
+ * Get the height of a glyph
+ */
+uint32_t psf_get_height(psf_file_t *psf) {
+    switch(psf->version) {
+    case 1: return ((psf1_hdr_t *)psf->file)->char_sz;
+    case 2: return ((psf2_hdr_t *)psf->file)->height;
+    }
+    return 0;
+}
+
+/**
+ * Get the size of a glyph
+ */
+uint32_t psf_get_size(psf_file_t *psf) {
+    switch(psf->version) {
+    case 1: return ((psf1_hdr_t *)psf->file)->char_sz;
+    case 2: return ((psf2_hdr_t *)psf->file)->glyph_sz;
+    }
+    return 0;
+}

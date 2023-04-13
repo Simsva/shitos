@@ -5,6 +5,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <stdio.h>
+#include <string.h>
 
 #if _ARCH == i386
 # include <kernel/arch/i386/paging.h>
@@ -50,6 +51,7 @@ void vmem_init(void) {
 #if _ARCH == i386
     /* create initial buffer PT */
     buffer_pt = kmalloc_a(PAGE_SIZE);
+    memset(buffer_pt, 0, PAGE_SIZE);
 #else
     puts("vmem_init not implemented for the current architecture");
 #endif

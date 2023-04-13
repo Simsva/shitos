@@ -35,7 +35,7 @@ OPT_VIDEO_QEMU,
 N_OPT_VIDEO,
 };
 /* TODO: auto-mode? */
-#define VIDEO_OPT_DEFAULT OPT_VIDEO_TEXT
+#define VIDEO_OPT_DEFAULT OPT_VIDEO_QEMU
 const char *opt_video_str[N_OPT_VIDEO] = { "Text Mode", "QEMU", };
 
 /* timer */

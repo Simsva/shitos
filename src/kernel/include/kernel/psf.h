@@ -43,5 +43,8 @@ void psf_generate_utf16_map(psf_file_t *psf);
 uint32_t psf_get_glyph_unicode(psf_file_t *psf, uint16_t c);
 uint32_t psf_get_glyph(psf_file_t *psf, uint32_t c);
 void *psf_get_bitmap(psf_file_t *psf, uint16_t glyph);
+uint32_t psf_get_width(psf_file_t *psf);
+uint32_t psf_get_height(psf_file_t *psf);
+uint32_t psf_get_size(psf_file_t *psf);
 
 #endif // KERNEL_PSF_H_

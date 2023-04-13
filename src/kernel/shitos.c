@@ -22,16 +22,6 @@ void ide_init(void);
 void dospart_init(void);
 void bootpart_init(void);
 
-static void tree_print_fs(tree_item_t item) {
-    struct vfs_entry *entry = item;
-    printf("%s", entry->name);
-    if(entry->fs_type)
-        printf("[%s]", entry->fs_type);
-    if(entry->file)
-        printf(" -> %s : %u", entry->file->name, entry->file->inode);
-    putchar('\n');
-}
-
 void kmain(struct kernel_args *args) {
     memcpy(&kernel_args, args, sizeof kernel_args);
 
@@ -42,11 +32,6 @@ void kmain(struct kernel_args *args) {
     dospart_init();
     bootpart_init();
     ext2fs_init();
-    fb_init();
-    if(kernel_args.video_mode == VIDEO_TEXT)
-        tm_term_install();
-    else
-        fb_term_install();
     zero_install();
     random_install();
     ps2hid_install();
@@ -56,10 +41,13 @@ void kmain(struct kernel_args *args) {
     vfs_mount_type("ext2fs", "/dev/ada2,rw,verbose", "/");
     vfs_mount_type("bootpart", "/dev/ada1,verbose", "/boot");
 
-    puts("Booting ShitOS (" EXPAND_STR(_ARCH) ")");
+    fb_init();
+    if(kernel_args.video_mode == VIDEO_TEXT)
+        tm_term_install();
+    else
+        fb_term_install("/usr/share/consolefonts/default8x16.psfu");
 
-    printf("fs_tree:\n");
-    tree_debug_dump(fs_tree, tree_print_fs);
+    puts("Welcome to ShitOS (" EXPAND_STR(_ARCH) ")");
 
     int i, j, n;
     for(i = 0; i < 11; i++) {
@@ -71,7 +59,7 @@ void kmain(struct kernel_args *args) {
         printf("\n");
     }
 
-    printf("\033[38;5;128m\033[48;2;1;2;3m");
+    printf("\033[48;5;114m                ");
 
     for(;;) asm volatile("hlt");
 }

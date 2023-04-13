@@ -73,11 +73,12 @@ void i386_map_page(void *paddr, void *vaddr, uint8_t flags) {
         }
         pd[pdi] = (uint32_t)i386_get_paddr(buffer_pt) | 0x1;
         buffer_pt = kmalloc_a(I386_PAGE_SIZE);
+        memset(buffer_pt, 0, I386_PAGE_SIZE);
     }
 
     if(pt[pti] & 0x1) {
         /* TODO: kerror or something */
-        puts("PT entry already mapped");
+        printf("PT entry already mapped (%p)\n", vaddr);
         return;
     }
 

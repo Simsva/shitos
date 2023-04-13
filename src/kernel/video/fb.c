@@ -185,7 +185,7 @@ static void graphics_install_qemu(void) {
     fb_memsize = vals[2];
 
     uint16_t id = qemu_mmio_in(QEMU_MMIO_ID);
-    printf("QEMU BGA: id: %u\n", id);
+    printf("QEMU BGA: id: %#06x\n", id);
     if(id < 0xb0c0 || id > 0xb0c6) return;
 
     qemu_set_resolution(fb_width, fb_height);
@@ -221,7 +221,6 @@ void fb_init(void) {
 
     case VIDEO_QEMU:
         graphics_install_qemu();
-        memset(fb_vid_memory, 0xff, fb_stride*fb_height);
         return;
     }
 
