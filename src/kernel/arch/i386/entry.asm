@@ -89,6 +89,13 @@ _highstart:
 
     call vmem_init
 
+    ;; initialize the FPU
+    mov eax, cr0
+    or eax, 1<<1 | 1<<4
+    and eax, ~(1<<2 | 1<<3)
+    mov cr0, eax
+    fninit
+
     sti
 
     ;; call kmain

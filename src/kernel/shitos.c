@@ -59,7 +59,5 @@ void kmain(struct kernel_args *args) {
         printf("\n");
     }
 
-    printf("\033[48;5;114m                ");
-
     for(;;) asm volatile("hlt");
 }
