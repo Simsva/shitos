@@ -7,10 +7,10 @@
 #include <kernel/psf.h>
 #include <kernel/video.h>
 #include <kernel/console.h>
-
 #include <stdint.h>
 #include <stddef.h>
 #include <string.h>
+#include "ansi_codes.h"
 
 #define DEFAULT_COLOR_FG 0xaaaaaa
 #define DEFAULT_COLOR_BG 0x000000
@@ -107,6 +107,19 @@ static void fb_term_render_char(uint32_t cur_x, uint32_t cur_y, uint32_t uc, uin
 
 static void fb_term_ansi_callback(ansi_ctx_t *ctx, enum ansi_out type, uint32_t uc) {
     if(type == ANSI_OUT_CHAR) {
+        /* ignore DEL */
+        if(uc == '\177') return;
+
+        /* C0 control chars */
+        if(uc < ' ') {
+            switch(uc) {
+            case C0_HT:
+                ctx->cur_x = (ctx->cur_x+1 + 7) & ~7;
+                break;
+            }
+            return;
+        }
+
         fb_term_render_char(ctx->cur_x, ctx->cur_y, uc,
                             ctx->color_fg, ctx->color_bg);
         ctx->cur_x++;
