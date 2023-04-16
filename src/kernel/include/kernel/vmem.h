@@ -32,6 +32,9 @@
 #define VMEM_HEAP_INDEX_SZ   0x20000
 #define VMEM_HEAP_INITIAL_SZ 0x100000
 
+/* addresses */
+#define VMEM_MAP_PAGES_MEMORY 0xf0000000
+
 /* heap types */
 typedef struct {
     uint32_t magic;
@@ -53,6 +56,7 @@ typedef struct {
 extern vmem_heap_t kheap;
 
 /* pages/frames */
+void      vmem_init(void);
 void      vmem_frame_set(uintptr_t frame_addr);
 void      vmem_frame_unset(uintptr_t frame_addr);
 int       vmem_frame_test(uintptr_t frame_addr);
@@ -60,6 +64,8 @@ uintptr_t vmem_frame_find_first(void);
 uintptr_t vmem_frame_find_first_n(unsigned n);
 void      vmem_frame_alloc(page_t *page, unsigned flags);
 void      vmem_frame_map_addr(page_t *page, unsigned flags, uintptr_t paddr);
+void     *vmem_map_vaddr(uintptr_t paddr);
+void     *vmem_map_vaddr_n(uintptr_t paddr, size_t sz);
 void      vmem_frame_free(page_t *page);
 uintptr_t vmem_get_paddr(page_t *dir, uintptr_t vaddr);
 page_t   *vmem_get_page(uintptr_t vaddr, unsigned flags);
@@ -68,7 +74,6 @@ void      vmem_free_dir(page_t *dir);
 int vmem_validate_user_ptr(void *vaddr, size_t sz, unsigned flags);
 
 /* heap */
-void  vmem_heap_init(void);
 void  vmem_heap_create(vmem_heap_t *heap, void *start, void *end, void *max);
 void *vmem_heap_alloc(vmem_heap_t *heap, size_t size, uint8_t align);
 void  vmem_heap_free(vmem_heap_t *heap, void *p);

@@ -5,6 +5,8 @@ bits 32
     %define PT_START (entry_pt - KERNEL_MAP)
     %define PD_START (kernel_pd - KERNEL_MAP)
 
+extern kernel_pd
+
 extern gdt_install
 extern idt_install
 extern irq_install
@@ -104,11 +106,6 @@ _highstart:
     jmp kmain
 
 section .bss
-
-global kernel_pd
-
-align 0x1000
-kernel_pd:  resb 0x1000
 
 stack_bottom:
     resb 0x4000                 ; 16 KiB

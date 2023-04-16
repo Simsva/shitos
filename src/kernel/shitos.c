@@ -9,8 +9,6 @@
 
 #include <kernel/arch/i386/ports.h>
 
-#include <kernel/psf.h>
-
 #define STR(s) #s
 #define EXPAND_STR(s) STR(s)
 

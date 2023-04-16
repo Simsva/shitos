@@ -1,5 +1,4 @@
 #include <kernel/vmem.h>
-
 #include <kernel/kmem.h>
 #include <assert.h>
 #include <stdint.h>
@@ -7,99 +6,12 @@
 #include <stdio.h>
 #include <string.h>
 
-#if _ARCH == i386
-# include <kernel/arch/i386/paging.h>
-#endif
-
 static void vmem_heap_expand(vmem_heap_t *heap, size_t new_sz);
 static int vmem_header_compar(ord_arr_type_t a, ord_arr_type_t b);
 static size_t vmem_heap_contract(vmem_heap_t *heap, size_t new_sz);
 static size_t vmem_heap_hole_find(vmem_heap_t *heap, size_t sz, uint8_t align);
 
 vmem_heap_t kheap = {0};
-
-void *vmem_get_paddr(void *vaddr) {
-#if _ARCH == i386
-    return i386_get_paddr(vaddr);
-#else
-    puts("vmem_get_paddr not implemented for the current architecture");
-    return NULL;
-#endif
-}
-
-void vmem_map(void *paddr, void *vaddr, uint8_t flags) {
-#if _ARCH == i386
-    i386_map_page(paddr, vaddr, flags);
-#else
-    puts("vmem_map not implemented for the current architecture");
-#endif
-}
-
-void vmem_unmap(void *vaddr) {
-#if _ARCH == i386
-    i386_unmap_page(vaddr);
-#else
-    puts("vmem_unmap not implemented for the current architecture");
-#endif
-}
-
-void vmem_init(void) {
-    /* create heap, assume kmem_head is aligned */
-    vmem_heap_create(&kheap, kmem_head, kmem_head+VMEM_HEAP_INITIAL_SZ,
-                     (void *)0xcffff000);
-
-#if _ARCH == i386
-    /* create initial buffer PT */
-    buffer_pt = kmalloc_a(PAGE_SIZE);
-    memset(buffer_pt, 0, PAGE_SIZE);
-#else
-    puts("vmem_init not implemented for the current architecture");
-#endif
-}
-
-void vmem_alloc(void *vaddr, uint8_t flags) {
-#if _ARCH == i386
-    /* TODO: check if vaddr is mapped already */
-    uint32_t frame = frame_find_first();
-    assert(frame != UINT32_MAX);
-    i386_map_page((void *)(frame * PAGE_SIZE), vaddr, flags);
-#else
-    puts("vmem_page_alloc not implemented for the current architecture");
-#endif
-}
-
-/**
- * Check if a pointer is mapped in the current page directory.
- */
-int vmem_validate_ptr(void *vaddr, size_t sz, uint8_t flags) {
-    if(vaddr == NULL && !(flags & PAGE_PTR_FLAG_NULL)) return 0;
-
-#if _ARCH == i386
-    uint32_t base = (uint32_t)vaddr;
-    uint32_t end = sz ? (base + sz-1) : base;
-
-    uint32_t page_base = base >> 12;
-    uint32_t page_end = end >> 12;
-
-    uint32_t *pd = (uint32_t *)0xfffff000;
-    for(uint32_t page = page_base; page <= page_end; page++) {
-        uint32_t pdi = page >> 10;
-        uint32_t pti = page & 0x3ff;
-        uint32_t *pt = (uint32_t *)0xffc00000 + 0x400*pdi;
-
-        if(!pd[pdi]) return 0;
-        if(!(pt[pti] & PAGE_FLAG_PRESENT)) return 0;
-        if(!(pt[pti] & PAGE_FLAG_KERNEL)) return 0;
-        if(!(pt[pti] & PAGE_FLAG_RW) && flags & PAGE_PTR_FLAG_WRITE)
-            return 0;
-    }
-
-    return 1;
-#else
-    puts("vmem_validate_ptr not implemented for the current architecture");
-    return 0;
-#endif
-}
 
 /* heap */
 static int vmem_header_compar(ord_arr_type_t a, ord_arr_type_t b) {
@@ -143,7 +55,9 @@ static void vmem_heap_expand(vmem_heap_t *heap, size_t new_sz) {
 
     size_t old_sz = heap->end - heap->start;
     while(old_sz < new_sz) {
-        vmem_alloc(heap->start+old_sz, 0x2);
+        vmem_frame_alloc(vmem_get_page((uintptr_t)heap->start+old_sz,
+                                       VMEM_GET_CREATE|VMEM_GET_KERNEL),
+                         VMEM_FLAG_KERNEL|VMEM_FLAG_KERNEL);
         old_sz += PAGE_SIZE;
     }
     heap->end = heap->start + new_sz;
@@ -157,7 +71,8 @@ static size_t __unused vmem_heap_contract(vmem_heap_t *heap, size_t new_sz) {
 
     size_t old_sz = heap->end - heap->start;
     while(old_sz > new_sz) {
-        vmem_unmap((void *)old_sz);
+        vmem_frame_free(vmem_get_page((uintptr_t)heap->start+old_sz,
+                                      VMEM_GET_CREATE|VMEM_GET_KERNEL));
         old_sz -= PAGE_SIZE;
     }
     heap->end = heap->start + new_sz;

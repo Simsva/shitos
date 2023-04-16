@@ -24,7 +24,7 @@
 #define QEMU_MMIO_VIRTY    0x0e
 
 /* TODO: syscalls + signals, because now this does nothing */
-#define validate(ptr) vmem_validate_ptr(ptr, 1, 0)
+#define validate(ptr) vmem_validate_user_ptr(ptr, 1, 0)
 
 static fs_node_t *vga_text_dev, *fb_dev;
 
@@ -70,7 +70,8 @@ static int vga_ioctl(__unused fs_node_t *node, unsigned long request, void *argp
                 validate((void *)(*(uintptr_t *)argp));
                 vga_user_off = *(uintptr_t *)argp;
             }
-            vmem_map((void *)vga_user_off, (void *)0xb8000, PAGE_FLAG_RW);
+            vmem_frame_map_addr(vmem_get_page(vga_user_off, VMEM_GET_CREATE),
+                                VMEM_FLAG_WRITE, 0xb8000);
             *((uintptr_t *)argp) = vga_user_off;
         }
         return 0;
@@ -114,15 +115,9 @@ static void qemu_scan_pci(pci_device_t device, uint16_t vid, uint16_t did, void 
             out[2] = s;
             pci_write_register(device, PCI_BAR0, 4, t);
 
-            /* identity map video + mmio memory */
-            /* XXX: this may be a VERY bad idea */
-            void *ta = (void *)(t & 0xfffffff0),
-                 *ma = (void *)(m & 0xfffffff0);
-            for(uintptr_t i = 0; i < s; i += PAGE_SIZE)
-                vmem_map(ta + i, ta + i, PAGE_FLAG_RW);
-            vmem_map(ma, ma, PAGE_FLAG_RW);
-            out[0] = (uintptr_t)ta;
-            out[1] = (uintptr_t)ma;
+            /* map video + mmio memory */
+            out[0] = (uintptr_t)vmem_map_vaddr_n(t & 0xfffffff0, s);
+            out[1] = (uintptr_t)vmem_map_vaddr(m & 0xfffffff0);
         }
     }
 }
@@ -153,7 +148,8 @@ static void qemu_set_resolution(uint16_t w, uint16_t h) {
 }
 
 static void graphics_install_text(void) {
-    vmem_map((void *)0xb8000, fb_vid_memory, PAGE_FLAG_RW);
+    vmem_frame_map_addr(vmem_get_page((uintptr_t)fb_vid_memory, VMEM_GET_CREATE),
+                        VMEM_FLAG_WRITE, 0xb8000);
 
     vga_text_dev = kmalloc(sizeof(fs_node_t));
     memset(vga_text_dev, 0, sizeof(fs_node_t));
@@ -166,7 +162,8 @@ static void graphics_install_text(void) {
 }
 
 static void graphics_install_preset(void) {
-    vmem_map((void *)kernel_args.video_memory, fb_vid_memory, PAGE_FLAG_RW);
+    vmem_frame_map_addr(vmem_get_page((uintptr_t)fb_vid_memory, VMEM_GET_CREATE),
+                        VMEM_FLAG_WRITE, kernel_args.video_memory);
 
     fb_stride = fb_width * fb_depth/8;
     fb_memsize = fb_stride * fb_height;

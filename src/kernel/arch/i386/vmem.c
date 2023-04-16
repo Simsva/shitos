@@ -1,5 +1,6 @@
 #include <kernel/vmem.h>
 #include <kernel/kmem.h>
+#include <kernel/hashmap.h>
 #include <strings.h>
 #include <string.h>
 #include <stdio.h>
@@ -35,25 +36,85 @@
 #define PT_FLAGS_KERNELMODE  (PT_FLAG_PRESENT|PT_FLAG_WRITE)
 #define PT_FLAGS_USERMODE    (PT_FLAG_PRESENT|PT_FLAG_WRITE|PT_FLAG_USER)
 
-/* globals */
-/* TODO: initial memory maps to load in paging_init */
-extern page_t *kernel_pd;
-
 /* frame bitset */
 uint32_t *frames;
 size_t frame_count;
 
+/* reserved pages for mapping */
+uint32_t map_pages[2048] = { 0 };
+#define map_pages_count (sizeof map_pages * 8*sizeof *map_pages)
+static hashmap_t *map_pages_index = NULL;
+
+/* TODO: move all pre-allocated pages here */
+#define __pagemap __attribute__((aligned(PAGE_SIZE))) = {0}
+page_t kernel_pd[1024] __pagemap;
+/* page tables that cover the entire mapping region */
+page_t map_pages_pt[64][1024] __pagemap;
+
 #define INDEX_FROM_BIT(a)  (a / (8*sizeof(frames[0])))
 #define OFFSET_FROM_BIT(a) (a % (8*sizeof(frames[0])))
+
+static void vmem_frame_set_internal(uint32_t *frames, uintptr_t frame);
+static void vmem_frame_unset_internal(uint32_t *frames, uintptr_t frame);
+static int vmem_frame_test_internal(uint32_t *frames, uintptr_t frame);
+static uintptr_t vmem_frame_find_first_internal(uint32_t *frames, uintptr_t min, uintptr_t max);
+
+static void vmem_map_page_set(uintptr_t addr);
+static void vmem_map_page_unset(uintptr_t addr);
+static int vmem_map_page_test(uintptr_t addr);
+static uintptr_t vmem_map_page_find_first(void);
+static uintptr_t vmem_map_page_find_first_n(unsigned n);
+
+static void reload_pd(void);
+
+/**
+ * Initialize virtual memory (and the kernel heap).
+ */
+void vmem_init(void) {
+    vmem_heap_create(&kheap, kmem_head, kmem_head+VMEM_HEAP_INITIAL_SZ,
+                     (void *)0xcffff000);
+
+    map_pages_index = hashmap_create_int(128);
+    map_pages_index->value_free = NULL;
+}
+
+/* internal versions of bitset logic common between frames and map_pages
+ * XXX: all functions use the argument name "frames" for the macros to work */
+static inline void vmem_frame_set_internal(uint32_t *frames, uintptr_t frame) {
+    uint32_t index = INDEX_FROM_BIT(frame),
+             offset = OFFSET_FROM_BIT(frame);
+    frames[index] |= 1<<offset;
+}
+
+static inline void vmem_frame_unset_internal(uint32_t *frames, uintptr_t frame) {
+    uint32_t index = INDEX_FROM_BIT(frame),
+             offset = OFFSET_FROM_BIT(frame);
+    frames[index] &= ~(1<<offset);
+}
+
+static inline int vmem_frame_test_internal(uint32_t *frames, uintptr_t frame) {
+    uint32_t index = INDEX_FROM_BIT(frame),
+             offset = OFFSET_FROM_BIT(frame);
+    return (frames[index] & (1<<offset)) ? 1 : 0;
+}
+
+static uintptr_t vmem_frame_find_first_internal(uint32_t *frames, uintptr_t min, uintptr_t max) {
+    size_t i;
+    uint32_t x;
+
+    /* NOTE: skips the first MiB as it contains a lot of reserved memory */
+    for(i = INDEX_FROM_BIT(min); i < INDEX_FROM_BIT(max); i++)
+        if((x = ffsl(~frames[i]))) return i*8*sizeof(frames[0]) + x-1;
+
+    return UINTPTR_MAX;
+}
 
 /**
  * Mark the frame at address as used.
  */
 void vmem_frame_set(uintptr_t frame_addr) {
     uint32_t frame = frame_addr >> PAGE_BITS;
-    uint32_t index = INDEX_FROM_BIT(frame),
-             offset = OFFSET_FROM_BIT(frame);
-    frames[index] |= 1<<offset;
+    vmem_frame_set_internal(frames, frame);
 }
 
 /**
@@ -61,9 +122,7 @@ void vmem_frame_set(uintptr_t frame_addr) {
  */
 void vmem_frame_unset(uintptr_t frame_addr) {
     uint32_t frame = frame_addr >> PAGE_BITS;
-    uint32_t index = INDEX_FROM_BIT(frame),
-             offset = OFFSET_FROM_BIT(frame);
-    frames[index] &= ~(1<<offset);
+    vmem_frame_unset_internal(frames, frame);
 }
 
 /**
@@ -71,21 +130,16 @@ void vmem_frame_unset(uintptr_t frame_addr) {
  */
 int vmem_frame_test(uintptr_t frame_addr) {
     uint32_t frame = frame_addr >> PAGE_BITS;
-    uint32_t index = INDEX_FROM_BIT(frame),
-             offset = OFFSET_FROM_BIT(frame);
-    return (frames[index] & (1<<offset)) ? 1 : 0;
+    return vmem_frame_test_internal(frames, frame);
 }
 
 /**
  * Find the first free frame.
  */
 uintptr_t vmem_frame_find_first(void) {
-    size_t i;
-    uint32_t x;
-
     /* NOTE: skips the first MiB as it contains a lot of reserved memory */
-    for(i = INDEX_FROM_BIT(0x100); i < INDEX_FROM_BIT(frame_count); i++)
-        if((x = ffsl(~frames[i]))) return i*8*sizeof(frames[0]) + x-1;
+    uintptr_t frame = vmem_frame_find_first_internal(frames, 0x100, frame_count);
+    if(frame != UINTPTR_MAX) return frame;
 
     printf(ANSI_FG_BRIGHT_WHITE ANSI_BG_RED "Out of memory.\n");
     arch_fatal();
@@ -118,6 +172,67 @@ uintptr_t vmem_frame_find_first_n(unsigned n) {
 }
 
 /**
+ * Same as vmem_frame_set, but for mapping pages.
+ */
+static void vmem_map_page_set(uintptr_t addr) {
+    uintptr_t idx = (addr - VMEM_MAP_PAGES_MEMORY) >> PAGE_BITS;
+    vmem_frame_set_internal(map_pages, idx);
+}
+
+/**
+ * Same as vmem_frame_unset, but for mapping pages.
+ */
+static __unused void vmem_map_page_unset(uintptr_t addr) {
+    uintptr_t idx = (addr - VMEM_MAP_PAGES_MEMORY) >> PAGE_BITS;
+    vmem_frame_unset_internal(map_pages, idx);
+}
+
+/**
+ * Same as vmem_frame_test, but for mapping pages.
+ */
+static int vmem_map_page_test(uintptr_t addr) {
+    uintptr_t idx = (addr - VMEM_MAP_PAGES_MEMORY) >> PAGE_BITS;
+    return vmem_frame_test_internal(map_pages, idx);
+}
+
+/**
+ * Same as vmem_frame_find_first, but for mapping pages.
+ */
+static uintptr_t vmem_map_page_find_first(void) {
+    uintptr_t idx = vmem_frame_find_first_internal(map_pages, 0, map_pages_count);
+    if(idx != UINTPTR_MAX) return VMEM_MAP_PAGES_MEMORY + (idx << PAGE_BITS);
+
+    printf(ANSI_FG_BRIGHT_WHITE ANSI_BG_RED "Out of reserved mapping pages.\n");
+    arch_fatal();
+    return UINTPTR_MAX;
+}
+
+/**
+ * Same as vmem_frame_find_first_n, but for mapping pages.
+ */
+static uintptr_t vmem_map_page_find_first_n(unsigned n) {
+    size_t i;
+    unsigned j;
+
+    for(i = 0; i < map_pages_count; i++) {
+        int bad = 0;
+        for(j = 0; j < n; j++) {
+            if(vmem_map_page_test(VMEM_MAP_PAGES_MEMORY + PAGE_SIZE * (i+j))) {
+                bad = 1;
+                break;
+            }
+        }
+        if(!bad) return VMEM_MAP_PAGES_MEMORY + (i << PAGE_BITS);
+        else i += j;
+    }
+
+    printf(ANSI_FG_BRIGHT_WHITE ANSI_BG_RED
+           "Failed to map %d contiguous pages.\n", n);
+    arch_fatal();
+    return UINTPTR_MAX;
+}
+
+/**
  * Set the flags for a page and allocate a frame for it if needed.
  */
 void vmem_frame_alloc(page_t *page, unsigned flags) {
@@ -134,6 +249,8 @@ void vmem_frame_alloc(page_t *page, unsigned flags) {
     page->nocache = (flags & VMEM_FLAG_NOCACHE) ? 1 : 0;
     page->pat     = (flags & VMEM_FLAG_PAT) ? 1 : 0;
     page->global  = (flags & VMEM_FLAG_GLOBAL) ? 1 : 0;
+
+    reload_pd();
 }
 
 /**
@@ -146,19 +263,61 @@ void vmem_frame_map_addr(page_t *page, unsigned flags, uintptr_t paddr) {
 }
 
 /**
- * Get a virtual address which maps to the given physical address.
+ * Get a virtual address which maps to the given physical address in the
+ * reserved mapping region.
  */
-void *vmem_get_vaddr(uintptr_t paddr) {
-#warning "FIX THIS IMMEDIATELY! vmem_get_vaddr"
-    return (void *)paddr;
+void *vmem_map_vaddr(uintptr_t paddr) {
+    uintptr_t page_off = paddr & (PAGE_SIZE-1);
+    paddr &= ~(PAGE_SIZE-1);
+
+    uintptr_t vaddr;
+    if((vaddr = (uintptr_t)hashmap_get(map_pages_index, (void *)paddr)))
+        return (void *)vaddr + page_off;
+
+    vaddr = vmem_map_page_find_first();
+    vmem_map_page_set(vaddr);
+    vmem_frame_map_addr(vmem_get_page(vaddr, VMEM_GET_CREATE|VMEM_GET_KERNEL),
+                        VMEM_FLAG_KERNEL|VMEM_FLAG_WRITE, paddr);
+
+    hashmap_set(map_pages_index, (void *)paddr, (void *)vaddr);
+    return (void *)vaddr + page_off;
+}
+
+/**
+ * Get a virtual address which maps the the given physical address for sz bytes.
+ * NOTE: will remap new addresses after each call, so never use this twice on
+ * the same physical memory.
+ */
+void *vmem_map_vaddr_n(uintptr_t paddr, size_t sz) {
+    uintptr_t page_off = paddr & (PAGE_SIZE-1);
+    paddr &= ~(PAGE_SIZE-1);
+
+    unsigned n_pages = (sz + page_off + PAGE_SIZE-1) / PAGE_SIZE;
+    uintptr_t vaddr = vmem_map_page_find_first_n(n_pages);
+
+    /* NOTE: use two loops so vmem_get_page does not use up one of our pages */
+    for(unsigned i = 0; i < n_pages; i++)
+        vmem_map_page_set(vaddr + i*PAGE_SIZE);
+    for(unsigned i = 0; i < n_pages; i++) {
+        vmem_frame_map_addr(vmem_get_page(vaddr + i*PAGE_SIZE,
+                                          VMEM_GET_CREATE|VMEM_GET_KERNEL),
+                            VMEM_FLAG_KERNEL|VMEM_FLAG_WRITE, paddr + i*PAGE_SIZE);
+
+        hashmap_set(map_pages_index, (void *)paddr + i*PAGE_SIZE,
+                                     (void *)vaddr + i*PAGE_SIZE);
+    }
+
+    return (void *)vaddr + page_off;
 }
 
 /**
  * Free the frame pointed at by a page.
  * TODO: refcounts
  */
-void vmem_page_free(page_t *page) {
+void vmem_frame_free(page_t *page) {
     vmem_frame_unset(page->frame << PAGE_BITS);
+    page->raw = 0;
+    reload_pd();
 }
 
 /**
@@ -170,20 +329,29 @@ uintptr_t vmem_get_paddr(page_t *pd, uintptr_t vaddr) {
     uintptr_t pti = (page_addr)       & 0x3ff;
 
     if(!pd[pdi].present) return UINTPTR_MAX;
-    page_t *pt = vmem_get_vaddr((uintptr_t)pd[pdi].frame << PAGE_BITS);
+    page_t *pt = vmem_map_vaddr((uintptr_t)pd[pdi].frame << PAGE_BITS);
 
     if(!pt[pti].present) return UINTPTR_MAX;
     return ((uintptr_t)pt[pti].frame << PAGE_BITS) | (vaddr & (PAGE_SIZE-1));
 }
 
 /**
- * Get a the page for a given virtual address from the current page directory.
+ * Get the page for a given virtual address from the current page directory.
  *
  * If an intermediate table is not found and the VMEM_GET_CREATE flag is set, it
  * will be allocated (with user mode access if VMEM_GET_KERNEL is not set).
  * Otherwise NULL is returned.
  */
 page_t *vmem_get_page(uintptr_t vaddr, unsigned flags) {
+    /* if in the general mapping region,
+     * assumed to be mapped in every page directory */
+    if(vaddr >= 0xf0000000) {
+        uintptr_t page_addr = (vaddr - 0xf0000000) >> PAGE_BITS;
+        uintptr_t pdi = (page_addr >> 10) & 0x3ff;
+        uintptr_t pti = (page_addr)       & 0x3ff;
+        return &map_pages_pt[pdi][pti];
+    }
+
     uintptr_t page_addr = vaddr >> PAGE_BITS;
     uintptr_t pdi = (page_addr >> 10) & 0x3ff;
     uintptr_t pti = (page_addr)       & 0x3ff;
@@ -196,12 +364,12 @@ page_t *vmem_get_page(uintptr_t vaddr, unsigned flags) {
 
         uintptr_t frame = vmem_frame_find_first() << PAGE_BITS;
         vmem_frame_set(frame);
-        memset(vmem_get_vaddr(frame), 0, PAGE_SIZE);
+        memset(vmem_map_vaddr(frame), 0, PAGE_SIZE);
         pd[pdi].raw = frame | (flags & VMEM_GET_KERNEL
                                ? PD_FLAGS_KERNELMODE
                                : PD_FLAGS_USERMODE);
     }
-    page_t *pt = vmem_get_vaddr((uintptr_t)pd[pdi].frame << PAGE_BITS);
+    page_t *pt = vmem_map_vaddr((uintptr_t)pd[pdi].frame << PAGE_BITS);
 
     return pt + pti;
 not_found:
@@ -210,65 +378,32 @@ not_found:
 
 void vmem_free_dir(page_t *dir);
 
-int vmem_validate_user_ptr(void *vaddr, size_t sz, unsigned flags);
+/**
+ * Check if a pointer is accessable in user mode in the current page directory.
+ */
+int vmem_validate_user_ptr(void *vaddr, size_t sz, unsigned flags) {
+    if(vaddr == NULL && !(flags & VMEM_PTR_FLAG_NULL)) return 0;
 
-/* standard vmem functions */
-void *i386_get_paddr(void *vaddr) {
-    uint32_t pdi = (uint32_t)vaddr >> 22;
-    uint32_t pti = (uint32_t)vaddr >> 12 & 0x3ff;
+    uintptr_t base = (uintptr_t)vaddr;
+    uintptr_t end = sz ? (base + sz-1) : base;
 
-    uint32_t *pt = (uint32_t *)0xffc00000 + 0x400 * pdi;
+    uintptr_t page_base = base >> PAGE_BITS;
+    uintptr_t page_end = end >> PAGE_BITS;
 
-    return (void *)((pt[pti] & ~0xfff) + ((uint32_t)vaddr & 0xfff));
-}
+    for(uintptr_t page = page_base; page <= page_end; page++) {
+        page_t *page_entry = vmem_get_page(page, 0);
 
-void i386_map_page(void *paddr, void *vaddr, uint8_t flags) {
-    uint32_t pdi = (uint32_t)vaddr >> 22;
-    uint32_t pti = (uint32_t)vaddr >> 12 & 0x3ff;
-
-    uint32_t *pd = (uint32_t *)0xfffff000;
-    uint32_t *pt = (uint32_t *)0xffc00000 + 0x400 * pdi;
-
-    if(!(pd[pdi] & 0x1)) {
-        if(!buffer_pt) {
-            puts("\033[41mOut of memory!");
-            for(;;) asm volatile("hlt");
-        }
-        pd[pdi] = (uint32_t)i386_get_paddr(buffer_pt) | 0x1;
-        buffer_pt = kmalloc_a(I386_PAGE_SIZE);
-        memset(buffer_pt, 0, I386_PAGE_SIZE);
+        if(!page_entry) return 0;
+        if(!page_entry->present) return 0;
+        if(!page_entry->user) return 0;
+        if(!page_entry->write && flags & VMEM_PTR_FLAG_WRITE)
+            return 0;
     }
 
-    if(pt[pti] & 0x1) {
-        /* TODO: kerror or something */
-        printf("PT entry already mapped (%p)\n", vaddr);
-        return;
-    }
-
-    frame_set((uint32_t)paddr);
-    pt[pti] = (uint32_t)paddr | (flags & 0xfff) | 0x1;
-
-    asm volatile("mov %%cr3, %%eax; mov %%eax, %%cr3" ::: "%eax");
+    return 1;
 }
 
-void i386_unmap_page(void *vaddr) {
-    uint32_t pdi = (uint32_t)vaddr >> 22;
-    uint32_t pti = (uint32_t)vaddr >> 12 & 0x3ff;
-
-    uint32_t *pd = (uint32_t *)0xfffff000;
-    uint32_t *pt = (uint32_t *)0xffc00000 + 0x400 * pdi;
-
-    if(!(pd[pdi] & 0x1)) return;
-    frame_unset((uint32_t)i386_get_paddr(vaddr));
-    pt[pti] = 0;
-
-    /* remove PD entry when empty */
-    for(uint16_t i = 0; i < I386_PAGE_SIZE/sizeof(uint32_t); i++)
-        if(pt[i] & 0x1) goto not_empty;
-    /* TODO: free PT */
-    pd[pdi] = 0;
-not_empty:
-
+static void reload_pd(void) {
     asm volatile("mov %%cr3, %%eax; mov %%eax, %%cr3" ::: "%eax");
 }
 
