@@ -17,7 +17,8 @@
         |= 1<<((a) % UINT32_WIDTH);
 
 extern void *kmem_head;
-extern page_t kernel_pd[1024];
+extern page_directory_t kernel_pd;
+extern page_t kernel_pts[1024];
 extern int *_kernel_lowtext_start;
 extern uint32_t frame_count;
 extern uint32_t *frames;
@@ -31,7 +32,9 @@ __attribute__((section(".low.text"))) void paging_init(void) {
     /* get physical address of kmem_head */
     kmem_head_low = (void **)PADDR(&kmem_head);
     /* get physical address of pd */
-    pd = (uint32_t *)PADDR(&kernel_pd);
+    pd = (uint32_t *)PADDR(&kernel_pts);
+    /* inialize kernel pd */
+    ((page_directory_t *)PADDR(&kernel_pd))->paddr = (uintptr_t)pd;
     pdcur = pd + (KERNEL_MAP>>22);
 
     ptbase = *kmem_head_low;

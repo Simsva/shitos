@@ -8,6 +8,8 @@
 #include <string.h>
 
 #include <kernel/arch/i386/ports.h>
+#include <kernel/pipe.h>
+#include <kernel/vmem.h>
 
 #define STR(s) #s
 #define EXPAND_STR(s) STR(s)

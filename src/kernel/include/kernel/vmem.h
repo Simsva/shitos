@@ -69,7 +69,10 @@ void     *vmem_map_vaddr_n(uintptr_t paddr, size_t sz);
 void      vmem_frame_free(page_t *page);
 uintptr_t vmem_get_paddr(page_t *dir, uintptr_t vaddr);
 page_t   *vmem_get_page(uintptr_t vaddr, unsigned flags);
-void      vmem_free_dir(page_t *dir);
+
+page_directory_t *vmem_clone_dir(page_directory_t *src);
+void              vmem_set_dir(page_directory_t *dir);
+void              vmem_free_dir(page_directory_t *dir);
 
 int vmem_validate_user_ptr(void *vaddr, size_t sz, unsigned flags);
 

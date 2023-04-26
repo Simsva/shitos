@@ -1,5 +1,6 @@
 #include <kernel/vmem.h>
 #include <kernel/kmem.h>
+#include <kernel/process.h>
 #include <kernel/hashmap.h>
 #include <strings.h>
 #include <string.h>
@@ -8,7 +9,7 @@
 #include <ansi.h>
 
 #include <kernel/arch/i386/idt.h>
-#include <kernel/arch/i386/error.h>
+#include <kernel/arch/i386/arch.h>
 
 /* page directory flags */
 #define PD_FLAG_PRESENT      0x001
@@ -47,9 +48,11 @@ static hashmap_t *map_pages_index = NULL;
 
 /* TODO: move all pre-allocated pages here */
 #define __pagemap __attribute__((aligned(PAGE_SIZE))) = {0}
-page_t kernel_pd[1024] __pagemap;
+page_t kernel_pts[1024] __pagemap;
 /* page tables that cover the entire mapping region */
 page_t map_pages_pt[64][1024] __pagemap;
+
+page_directory_t kernel_pd = {.pts = kernel_pts};
 
 #define INDEX_FROM_BIT(a)  (a / (8*sizeof(frames[0])))
 #define OFFSET_FROM_BIT(a) (a % (8*sizeof(frames[0])))
@@ -58,6 +61,8 @@ static void vmem_frame_set_internal(uint32_t *frames, uintptr_t frame);
 static void vmem_frame_unset_internal(uint32_t *frames, uintptr_t frame);
 static int vmem_frame_test_internal(uint32_t *frames, uintptr_t frame);
 static uintptr_t vmem_frame_find_first_internal(uint32_t *frames, uintptr_t min, uintptr_t max);
+
+static void vmem_copy_page(page_t *dst_pt, page_t *src_pt, size_t i);
 
 static void vmem_map_page_set(uintptr_t addr);
 static void vmem_map_page_unset(uintptr_t addr);
@@ -76,6 +81,8 @@ void vmem_init(void) {
 
     map_pages_index = hashmap_create_int(128);
     map_pages_index->value_free = NULL;
+
+    this_core->current_pd = &kernel_pd;
 }
 
 /* internal versions of bitset logic common between frames and map_pages
@@ -356,8 +363,7 @@ page_t *vmem_get_page(uintptr_t vaddr, unsigned flags) {
     uintptr_t pdi = (page_addr >> 10) & 0x3ff;
     uintptr_t pti = (page_addr)       & 0x3ff;
 
-    /* TODO: core */
-    page_t *pd = kernel_pd;
+    page_t *pd = this_core->current_pd->pts;
 
     if(!pd[pdi].present) {
         if(!(flags & VMEM_GET_CREATE)) goto not_found;
@@ -376,7 +382,65 @@ not_found:
     return NULL;
 }
 
-void vmem_free_dir(page_t *dir);
+/**
+ * Copy a single page.
+ */
+static void vmem_copy_page(page_t *dst_pt, page_t *src_pt, size_t i) {
+    /* TODO: refcounts */
+    dst_pt[i].raw = src_pt[i].raw;
+}
+
+/**
+ * Clone a page directory. If src is NULL, make an empty page directory.
+ */
+page_directory_t *vmem_clone_dir(page_directory_t *src) {
+    if(!src) src = &kernel_pd;
+
+    page_directory_t *dst = kmalloc(sizeof(page_directory_t));
+    dst->paddr = vmem_frame_find_first() << PAGE_BITS;
+    dst->pts = vmem_map_vaddr(dst->paddr);
+
+    /* zero bottom 3 GiB */
+    memset(dst->pts, 0, 0x300 * sizeof(page_t));
+    /* link top 1 GiB (kernel memory) */
+    memcpy(&dst->pts[0x300], &src->pts[0x300], 0x100 * sizeof(page_t));
+
+    /* copy page tables */
+    for(uint16_t i = 0; i < 0x300; i++) {
+        if(!src->pts[i].present) continue;
+        page_t *src_pt = vmem_map_vaddr(src->pts[i].frame << PAGE_BITS);
+
+        uintptr_t dst_pt_paddr = vmem_frame_find_first() << PAGE_BITS;
+        vmem_frame_set(dst_pt_paddr);
+        page_t *dst_pt = vmem_map_vaddr(dst_pt_paddr);
+        memset(dst_pt, 0, PAGE_SIZE);
+        dst->pts[i].raw = dst_pt_paddr | PT_FLAGS_USERMODE;
+
+        for(uint16_t j = 0; j < 0x400; j++) {
+            if(!src_pt[j].present) continue;
+            if(src_pt->user)
+                vmem_copy_page(dst_pt, src_pt, j);
+            else
+                dst_pt[j].raw = src_pt[j].raw;
+        }
+    }
+
+    return dst;
+}
+
+/**
+ * Set the current page directory.
+ */
+void vmem_set_dir(page_directory_t *dir) {
+    if(!dir) return;
+    this_core->current_pd = dir;
+    asm volatile("mov %0, %%cr3" :: "r"(dir));
+}
+
+/**
+ * TODO: Free a page directory.
+ */
+void vmem_free_dir(page_directory_t *dir);
 
 /**
  * Check if a pointer is accessable in user mode in the current page directory.
@@ -391,6 +455,7 @@ int vmem_validate_user_ptr(void *vaddr, size_t sz, unsigned flags) {
     uintptr_t page_end = end >> PAGE_BITS;
 
     for(uintptr_t page = page_base; page <= page_end; page++) {
+        /* TODO: this_core->current_proc->pd */
         page_t *page_entry = vmem_get_page(page, 0);
 
         if(!page_entry) return 0;

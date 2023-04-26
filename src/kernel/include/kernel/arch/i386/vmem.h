@@ -24,14 +24,9 @@ typedef union page {
     uint32_t raw;
 } page_t;
 
-typedef struct pagep {
-    page_t *page;
-    uintptr_t paddr;
-} pagep_t;
-
 typedef struct page_directory {
-    intptr_t refcount;
-    page_t *directory;
+    uintptr_t paddr;
+    page_t *pts;
 } page_directory_t;
 
 #define vmem_page_user_readable(p) (p->user)

@@ -3,9 +3,9 @@ bits 32
     %define KERNEL_MAP 0xc0000000
     %define PD_IND(x) ((x) >> 22)
     %define PT_START (entry_pt - KERNEL_MAP)
-    %define PD_START (kernel_pd - KERNEL_MAP)
+    %define PD_START (kernel_pts - KERNEL_MAP)
 
-extern kernel_pd
+extern kernel_pts
 
 extern gdt_install
 extern idt_install
