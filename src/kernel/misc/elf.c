@@ -8,7 +8,9 @@
 
 #define USER_STACK_SZ 0x80000
 
-int elf_exec(const char *path, fs_node_t *file, int argc, char *const argv[], char *const envp[], __unused int interp_depth) {
+#include <kernel/arch/i386/arch.h>
+
+int elf_exec(__unused const char *path, fs_node_t *file, int argc, char *const argv[], char *const envp[], __unused int interp_depth) {
     Elf32_Ehdr hdr;
     int ret = 0;
 
@@ -84,38 +86,44 @@ int elf_exec(const char *path, fs_node_t *file, int argc, char *const argv[], ch
         while(l-- > 0); \
     }
 
-    /* arguments */
-    char *argv_ptrs[argc];
-    for(int i = 0; i < argc; i++) {
-        PUSHSTR(argv[i]);
-        argv_ptrs[i] = (char *)stack;
+    char **_argv, **_envp;
+    {
+        /* arguments */
+        char *argv_ptrs[argc];
+        for(int i = 0; i < argc; i++) {
+            PUSHSTR(argv[i]);
+            argv_ptrs[i] = (char *)stack;
+        }
+
+        /* environment */
+        int envc = 0;
+        char *const *envp_tmp = envp;
+        while(*envp_tmp) envp_tmp++, envc++;
+        char *envp_ptrs[envc];
+        for(int i = 0; i < envc; i++) {
+            PUSHSTR(envp[i]);
+            envp_ptrs[i] = (char *)stack;
+        }
+
+        /* main arguments */
+        PUSH(uintptr_t, 0); /* envp NULL */
+        for(int i = envc; i > 0; i--) {
+            PUSH(char *, envp_ptrs[i-1]);
+        }
+        _envp = (char **)stack;
+        PUSH(uintptr_t, 0); /* argv NULL */
+        for(int i = argc; i > 0; i--) {
+            PUSH(char *, argv_ptrs[i-1]);
+        }
+        _argv = (char **)stack;
+        PUSH(int, argc);
     }
 
-    /* environment */
-    int envc = 0;
-    char *const *envp_tmp = envp;
-    while(*envp_tmp) envp_tmp++, envc++;
-    char *envp_ptrs[envc];
-    for(int i = 0; i < envc; i++) {
-        PUSHSTR(envp[i]);
-        envp_ptrs[i] = (char *)stack;
-    }
+#undef PUSH
+#undef PUSHSTR
 
-    /* main arguments */
-    PUSH(uintptr_t, 0); /* envp NULL */
-    for(int i = envc; i > 0; i--) {
-        PUSH(char *, envp_ptrs[i-1]);
-    }
-    char **_envp = (char **)stack;
-    PUSH(uintptr_t, 0); /* argv NULL */
-    for(int i = argv; i > 0; i--) {
-        PUSH(char *, argv_ptrs[i-1]);
-    }
-    char **_argv = (char **)stack;
-    PUSH(int, argc);
-
-    /* TODO: enter user mode */
-    /* enter_user(hdr.e_entry, argc, _argv, _envp, stack); */
+    arch_set_kernel_stack(this_core->current_proc->kernel_stack);
+    arch_enter_user(hdr.e_entry, argc, _argv, _envp, stack);
 
     return -EINVAL;
 ret_close:

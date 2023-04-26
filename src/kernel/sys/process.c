@@ -2,6 +2,8 @@
 #include <kernel/kmem.h>
 #include <string.h>
 
+#include <kernel/arch/i386/arch.h>
+
 static void _kidle(void);
 static void _kburn(void);
 

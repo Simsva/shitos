@@ -3,13 +3,12 @@
 #include <kernel/console.h>
 #include <kernel/video.h>
 #include <kernel/args.h>
+#include <kernel/process.h>
 #include <ext2fs/ext2.h>
 #include <stdio.h>
 #include <string.h>
 
-#include <kernel/arch/i386/ports.h>
-#include <kernel/pipe.h>
-#include <kernel/vmem.h>
+#include <kernel/arch/i386/arch.h>
 
 #define STR(s) #s
 #define EXPAND_STR(s) STR(s)
@@ -21,6 +20,10 @@ void ps2hid_install(void);
 void ide_init(void);
 void dospart_init(void);
 void bootpart_init(void);
+
+void user_test(void) {
+    asm volatile("mov $0x45, %ax");
+}
 
 void kmain(struct kernel_args *args) {
     memcpy(&kernel_args, args, sizeof kernel_args);
@@ -35,6 +38,7 @@ void kmain(struct kernel_args *args) {
     zero_install();
     random_install();
     ps2hid_install();
+    process_init();
 
     /* TODO: automatically detect devices somehow */
     vfs_mount_type("dospart", "/dev/ada", NULL);
@@ -58,6 +62,17 @@ void kmain(struct kernel_args *args) {
         }
         printf("\n");
     }
+
+    uintptr_t stack = 0x7fffffff;
+    vmem_frame_alloc(vmem_get_page(stack - (PAGE_SIZE-1), VMEM_GET_CREATE), VMEM_FLAG_WRITE);
+    stack -= 4;
+    *((uint16_t *)stack) = 0x30cd;       /* int 0x30 */
+    *((uint16_t *)(stack + 2)) = 0xfeeb; /* jmp $ */
+
+    uintptr_t kernel_stack;
+    asm volatile("mov %%esp, %0" : "=m"(kernel_stack));
+    arch_set_kernel_stack(kernel_stack);
+    arch_enter_user((uintptr_t)stack, 0, NULL, NULL, stack);
 
     for(;;) asm volatile("hlt");
 }

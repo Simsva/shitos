@@ -44,7 +44,7 @@ typedef struct processor_local {
     page_directory_t *current_pd;
 } process_local_t;
 
-static const process_local_t _this_core;
+static process_local_t _this_core;
 static process_local_t *const this_core = &_this_core;
 
 process_t *spawn_idle(int bsp);

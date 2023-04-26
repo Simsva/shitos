@@ -16,6 +16,12 @@ _gdt_flush:
 .1:
     ret
 
+global _tss_flush
+_tss_flush:
+    mov ax, 0x28 | 0x03
+    ltr ax
+    ret
+
 global _idt_load
 extern _idtp
 _idt_load:
