@@ -434,7 +434,7 @@ page_directory_t *vmem_clone_dir(page_directory_t *src) {
 void vmem_set_dir(page_directory_t *dir) {
     if(!dir) return;
     this_core->current_pd = dir;
-    asm volatile("mov %0, %%cr3" :: "r"(dir));
+    asm volatile("mov %0, %%cr3" :: "r"(dir->paddr));
 }
 
 /**

@@ -11,6 +11,8 @@ tree_t *process_tree;
 list_t *process_list;
 list_t *process_queue;
 
+process_local_t _this_core;
+
 static void _kidle(void) {
     for(;;) arch_pause();
 }

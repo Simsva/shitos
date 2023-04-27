@@ -13,8 +13,8 @@
 #define FRAMES (*(uint32_t **)PADDR(&frames))
 #define MAP_PAGES_PT (*(page_t (*)[64][1024])PADDR(&map_pages_pt))
 #define SET_FRAME(a) \
-    FRAMES[(a) / UINT32_WIDTH] \
-        |= 1<<((a) % UINT32_WIDTH);
+    FRAMES[(a) / 32] \
+        |= 1<<((a) % 32);
 
 extern void *kmem_head;
 extern page_directory_t kernel_pd;

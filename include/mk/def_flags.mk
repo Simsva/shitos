@@ -1,5 +1,5 @@
 ARCH?=i386
-HOST?=i686-elf
+HOST?=i686-shitos
 SYSROOT?=$(ROOT)/sysroot/
 PREFIX?=/usr
 EXEC_PREFIX?=$(PREFIX)

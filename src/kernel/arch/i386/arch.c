@@ -32,7 +32,7 @@ void arch_set_kernel_stack(uintptr_t stack) {
 /**
  * Enter user mode with the specified environment
  */
-void arch_enter_user(uintptr_t entry, int argc, char *const *argv, char *const *envp, uintptr_t stack) {
+void arch_enter_user(uintptr_t entry, int argc, char *const *argv, int envc, char *const *envp, uintptr_t stack) {
     uint32_t cs = 0x18 | 0x03;
     uint32_t ds = 0x20 | 0x03;
     uint32_t eip = entry;
@@ -54,8 +54,8 @@ void arch_enter_user(uintptr_t entry, int argc, char *const *argv, char *const *
         "pushl %4\n"  /* EIP */
         "iret"
         :: "m"(ds), "m"(esp), "m"(eflags), "m"(cs), "m"(eip),
-        /* use rdi, rsi, and rdx for arguments, as it is easier than putting
+        /* use edi, esi, edx, and ecx for arguments, as it is easier than putting
          * them on the stack */
-           "D"(argc), "S"(argv), "d"(envp)
+           "D"(argc), "S"(argv), "d"(envc), "c"(envp)
     );
 }

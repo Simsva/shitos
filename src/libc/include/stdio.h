@@ -20,6 +20,10 @@ _BEGIN_C_HEADER
 #undef  EOF
 #define EOF (-1)
 
+#define SEEK_SET 0  /* seek from beginning of file */
+#define SEEK_CUR 1  /* seek from current position */
+#define SEEK_END 2  /* seek from end of file */
+
 struct __FILE;
 
 typedef struct __FILE {
@@ -57,6 +61,16 @@ int vprintf(const char *__restrict, va_list);
 int vfprintf(FILE *__restrict, const char *__restrict, va_list);
 int vsprintf(char *__restrict, const char *__restrict, va_list);
 int vsnprintf(char *__restrict, size_t, const char *__restrict, va_list);
+
+/* for GCC, TODO: implement */
+int fclose(FILE *);
+int fflush(FILE *);
+FILE *fopen(const char *, const char *);
+size_t fread(void *, size_t, size_t, FILE *);
+int fseek(FILE *, long, int);
+long ftell(FILE *);
+size_t fwrite(const void *, size_t, size_t, FILE *);
+void setbuf(FILE *, char *);
 
 _END_C_HEADER
 

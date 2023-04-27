@@ -44,7 +44,7 @@ int elf_exec(__unused const char *path, fs_node_t *file, int argc, char *const a
         fs_read(file, hdr.e_phoff + hdr.e_phentsize*i, sizeof(Elf32_Phdr), (uint8_t *)&phdr);
 
         if(phdr.p_type == PT_LOAD) {
-            for(uintptr_t addr = phdr.p_vaddr; i < phdr.p_vaddr + phdr.p_memsz; i += PAGE_SIZE)
+            for(uintptr_t addr = phdr.p_vaddr; addr < phdr.p_vaddr + phdr.p_memsz; addr += PAGE_SIZE)
                 vmem_frame_alloc(vmem_get_page(addr, VMEM_GET_CREATE), VMEM_FLAG_WRITE);
 
             fs_read(file, phdr.p_offset, phdr.p_filesz, (uint8_t *)phdr.p_vaddr);
@@ -86,6 +86,7 @@ int elf_exec(__unused const char *path, fs_node_t *file, int argc, char *const a
         while(l-- > 0); \
     }
 
+    int envc;
     char **_argv, **_envp;
     {
         /* arguments */
@@ -96,7 +97,7 @@ int elf_exec(__unused const char *path, fs_node_t *file, int argc, char *const a
         }
 
         /* environment */
-        int envc = 0;
+        envc = 0;
         char *const *envp_tmp = envp;
         while(*envp_tmp) envp_tmp++, envc++;
         char *envp_ptrs[envc];
@@ -123,7 +124,7 @@ int elf_exec(__unused const char *path, fs_node_t *file, int argc, char *const a
 #undef PUSHSTR
 
     arch_set_kernel_stack(this_core->current_proc->kernel_stack);
-    arch_enter_user(hdr.e_entry, argc, _argv, _envp, stack);
+    arch_enter_user(hdr.e_entry, argc, _argv, envc, _envp, stack);
 
     return -EINVAL;
 ret_close:

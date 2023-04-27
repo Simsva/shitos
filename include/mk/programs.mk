@@ -1,7 +1,7 @@
 AS=nasm
 AR=$(HOST)-ar
-CC=$(HOST)-gcc --sysroot=$(SYSROOT)
-LD=$(HOST)-ld --sysroot=$(SYSROOT)
+CC=$(HOST)-gcc
+LD=$(HOST)-ld
 STRIP=$(HOST)-strip
 
-CC+=-isystem=$(SYSINCLUDEDIR)
+# CC+=-isystem=$(SYSINCLUDEDIR)

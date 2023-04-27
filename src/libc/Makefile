@@ -12,21 +12,22 @@ LIBK_ASFLAGS=$(ASFLAGS)
 ARCHDIR=arch/$(ARCH)
 LIBC=$(ROOT)/bin/libc.a
 LIBK=$(ROOT)/bin/libk.a
-LIBC_SRC_ASM=$(wildcard **/*.asm)
 LIBC_SRC_C=$(wildcard **/*.c)
 LIBC_SRC_MAKE=$(LIBC_SRC_C:.c=_c.d)
 LIBK_SRC_MAKE=$(LIBC_SRC_MAKE:.d=.libk.d)
 
+CRTS_ASM=$(wildcard $(ARCHDIR)/crt*.asm)
+CRTS=$(CRTS_ASM:.asm=.o)
+
 # FIXME: differentiate free from hosted objects
-LIBC_OBJ=$(LIBC_SRC_ASM:.asm=_asm.o) $(LIBC_SRC_C:.c=_c.o)
+LIBC_OBJ=$(LIBC_SRC_C:.c=_c.o)
 LIBK_OBJ=$(LIBC_OBJ:.o=.libk.o)
 
-# BINARIES=$(LIBC) $(LIBK)
-BINARIES=$(LIBK)
-BUILDFILES=$(LIBC_OBJ) $(LIBK_OBJ) $(LIBC_SRC_MAKE) $(LIBK_SRC_MAKE) $(BINARIES)
+LIBS=$(LIBC) $(LIBK)
+BUILDFILES=$(LIBC_OBJ) $(LIBK_OBJ) $(LIBC_SRC_MAKE) $(LIBK_SRC_MAKE) $(LIBS) $(CRTS)
 
 
-all: $(BINARIES)
+all: $(BINARIES) $(CRTS)
 
 
 clean:
@@ -41,9 +42,16 @@ include $(ROOT)/include/mk/compile.mk
 	@echo "CC	$(shell basename $@)"
 	@$(CC) -o $@ -c $< $(LIBK_CPPFLAGS) $(LIBK_CFLAGS)
 
+
 %_asm.libk.o: %.asm
 	@echo "AS	$(shell basename $@)"
 	@$(AS) -o $@ $< $(LIBK_ASFLAGS)
+
+
+# XXX: jank for crts
+%.o: %.asm
+	@echo "AS	$(shell basename $@)"
+	@$(AS) -o $@ $< $(ASFLAGS)
 
 
 $(LIBC): $(LIBC_OBJ)
@@ -56,15 +64,19 @@ $(LIBK): $(LIBK_OBJ)
 	@$(AR) rcs $@ $(LIBK_OBJ)
 
 
-install: install_headers install_libs
+install: install_headers install_libs install_crts
 install_headers:
 	@echo "Installing libc headers"
 	@mkdir -p $(SYSROOT)/$(SYSINCLUDEDIR)
 	@cp -R --preserve=timestamps include/. $(SYSROOT)/$(SYSINCLUDEDIR)/.
-install_libs: $(BINARIES)
+install_libs: $(LIBS)
 	@echo "Installing libc"
 	@mkdir -p $(SYSROOT)/$(SYSLIBDIR)
-	@cp -R --preserve=timestamps $(BINARIES) $(SYSROOT)/$(SYSLIBDIR)
+	@cp -R --preserve=timestamps $(LIBS) $(SYSROOT)/$(SYSLIBDIR)
+install_crts: $(CRTS)
+	@echo "Installing crts"
+	@mkdir -p $(SYSROOT)/$(SYSLIBDIR)
+	@cp -R --preserve=timestamps $(CRTS) $(SYSROOT)/$(SYSLIBDIR)
 
 
 -include $(LIBC_SRC_MAKE)

@@ -63,16 +63,9 @@ void kmain(struct kernel_args *args) {
         printf("\n");
     }
 
-    uintptr_t stack = 0x7fffffff;
-    vmem_frame_alloc(vmem_get_page(stack - (PAGE_SIZE-1), VMEM_GET_CREATE), VMEM_FLAG_WRITE);
-    stack -= 4;
-    *((uint16_t *)stack) = 0x30cd;       /* int 0x30 */
-    *((uint16_t *)(stack + 2)) = 0xfeeb; /* jmp $ */
-
-    uintptr_t kernel_stack;
-    asm volatile("mov %%esp, %0" : "=m"(kernel_stack));
-    arch_set_kernel_stack(kernel_stack);
-    arch_enter_user((uintptr_t)stack, 0, NULL, NULL, stack);
+    /* call init */
+    const char *init_argv[] = { "/bin/init", };
+    binfmt_system(init_argv[0], 1, (char *const *)init_argv, NULL);
 
     for(;;) asm volatile("hlt");
 }

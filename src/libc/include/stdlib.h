@@ -17,6 +17,7 @@ _BEGIN_C_HEADER
 typedef __typeof__(sizeof 0) size_t;
 
 void *malloc(size_t);
+void free(void *);
 
 typedef struct { int quot, rem; }       div_t;
 typedef struct { long quot, rem; }      ldiv_t;
@@ -28,6 +29,18 @@ lldiv_t lldiv(long long, long long);
 
 #define EXIT_SUCCESS 0
 #define EXIT_FAILURE 1
+
+/* for GCC, TODO: implement */
+_Noreturn void abort(void);
+int atexit(void (*)(void));
+int atoi(const char *);
+char *getenv(const char *);
+void *calloc(size_t, size_t);
+int abs(int);
+long labs(long);
+long long llabs(long long);
+_Noreturn void exit(int);
+_Noreturn void _Exit(int);
 
 _END_C_HEADER
 
