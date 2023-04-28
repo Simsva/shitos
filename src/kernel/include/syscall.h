@@ -2,6 +2,8 @@
 #define SYSCALL_H_
 
 #include <_cheader.h>
+#include <sys/types.h>
+#include <stddef.h>
 
 _BEGIN_C_HEADER
 
@@ -86,13 +88,12 @@ _BEGIN_C_HEADER
         return res; \
     }
 
-DECL_SYSCALL0(test0);
-DECL_SYSCALL1(test1, int);
-DECL_SYSCALL2(test2, int, int);
-DECL_SYSCALL3(test3, int, int, int);
-DECL_SYSCALL4(test4, int, int, int, int);
-DECL_SYSCALL5(test5, int, int, int, int, int);
-DECL_SYSCALL6(test6, int, int, int, int, int, int);
+DECL_SYSCALL1(exit,       int);
+DECL_SYSCALL3(open,       const char *, unsigned, mode_t);
+DECL_SYSCALL1(close,      int);
+DECL_SYSCALL3(read,       int, char *, size_t);
+DECL_SYSCALL3(write,      int, const char *, size_t);
+DECL_SYSCALL3(seek,       int, long, int);
 
 _END_C_HEADER
 

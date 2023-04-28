@@ -48,6 +48,8 @@ extern process_local_t _this_core;
 static process_local_t *const this_core = &_this_core;
 
 process_t *spawn_idle(int bsp);
+process_t *spawn_init(void);
+void process_exit(int ec);
 void process_init(void);
 
 int binfmt_exec(const char *path, int argc, char *const argv[], char *const envp[], int interp_depth);

@@ -64,6 +64,11 @@ process_t *spawn_init(void) {
     return init;
 }
 
+void process_exit(__unused int ec) {
+    /* TODO: SIGCHLD and task switching */
+    for(;;) asm volatile("hlt");
+}
+
 void process_init(void) {
     process_tree = tree_create();
     process_list = list_create();

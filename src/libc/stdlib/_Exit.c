@@ -1,5 +1,6 @@
 #include <stdlib.h>
+#include <syscall.h>
 
 _Noreturn void _Exit(__unused int ec) {
-    for(;;);
+    for(;;) syscall_exit(ec);
 }
