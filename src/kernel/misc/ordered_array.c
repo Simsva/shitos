@@ -49,6 +49,12 @@ ord_arr_type_t ord_arr_get(ord_arr_t *array, size_t i) {
     return array->array[i];
 }
 
+size_t ord_arr_index(ord_arr_t *array, ord_arr_type_t el) {
+    for(size_t i = 0; i < array->size; i++)
+        if(array->array[i] == el) return i;
+    return SIZE_MAX;
+}
+
 void ord_arr_remove(ord_arr_t *array, size_t i) {
     assert(i < array->size);
     array->size--;

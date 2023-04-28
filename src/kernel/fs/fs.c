@@ -15,8 +15,6 @@
 #define MAX(a,b) ((a) > (b) ? (a) : (b))
 #define MIN(a,b) ((a) < (b) ? (a) : (b))
 
-#define TREE_TO_FS_NODE(tree_node) (((struct vfs_entry *)((tree_node)->value))->file)
-
 tree_t *fs_tree = NULL;
 static hashmap_t *fs_types = NULL;
 
@@ -785,4 +783,13 @@ static fs_node_t *kopen_recur(const char *file, unsigned flags, unsigned symlink
 fs_node_t *kopen(const char *path, unsigned flags) {
     /* TODO: cwd that is not hardcoded to "/" maybe? */
     return kopen_recur(path, flags, 0, "/");
+}
+
+/**
+ * Increase the refcount of a node and return it.
+ */
+fs_node_t *fs_node_clone(fs_node_t *node) {
+    if(!node) return NULL;
+    if(node->refcount >= 0) node->refcount++;
+    return node;
 }

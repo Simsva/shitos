@@ -4,6 +4,7 @@
 #include <kernel/vmem.h>
 #include <kernel/tree.h>
 #include <kernel/list.h>
+#include <kernel/fs.h>
 #include <sys/types.h>
 
 #define KERNEL_STACK_SZ 0x8000
@@ -19,6 +20,14 @@ extern tree_t *process_tree;  /* process tree */
 extern list_t *process_list;  /* process flat list */
 extern list_t *process_queue; /* scheduler queue */
 
+typedef struct fd_table {
+    fs_node_t **entries;
+    uintmax_t *offs;
+    mode_t *modes;
+    size_t sz, max_sz;
+    uintmax_t refcount;
+} fd_table_t;
+
 typedef struct process {
     pid_t pid;
     uid_t uid, euid;
@@ -31,6 +40,10 @@ typedef struct process {
     uintptr_t sp, bp, ip;
     uintptr_t user_stack, kernel_stack, heap;
     uintptr_t entry;
+
+    char *wd_path;
+    fs_node_t *wd_node;
+    fd_table_t *fds;
 
     tree_node_t *tree_entry;
     list_node_t sched_node;
@@ -45,10 +58,13 @@ typedef struct processor_local {
 } process_local_t;
 
 extern process_local_t _this_core;
-static process_local_t *const this_core = &_this_core;
+/* static process_local_t *const this_core = &_this_core; */
+#define this_core (&_this_core)
 
 process_t *spawn_idle(int bsp);
 process_t *spawn_init(void);
+
+int process_add_fd(process_t *proc, fs_node_t *node);
 void process_exit(int ec);
 void process_init(void);
 

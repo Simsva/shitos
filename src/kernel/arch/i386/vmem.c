@@ -343,13 +343,13 @@ uintptr_t vmem_get_paddr(page_t *pd, uintptr_t vaddr) {
 }
 
 /**
- * Get the page for a given virtual address from the current page directory.
+ * Get the page for a given virtual address from another page directory.
  *
  * If an intermediate table is not found and the VMEM_GET_CREATE flag is set, it
  * will be allocated (with user mode access if VMEM_GET_KERNEL is not set).
  * Otherwise NULL is returned.
  */
-page_t *vmem_get_page(uintptr_t vaddr, unsigned flags) {
+page_t *vmem_get_page_other(page_directory_t *dir, uintptr_t vaddr, unsigned flags) {
     /* if in the general mapping region,
      * assumed to be mapped in every page directory */
     if(vaddr >= 0xf0000000) {
@@ -363,7 +363,7 @@ page_t *vmem_get_page(uintptr_t vaddr, unsigned flags) {
     uintptr_t pdi = (page_addr >> 10) & 0x3ff;
     uintptr_t pti = (page_addr)       & 0x3ff;
 
-    page_t *pd = this_core->current_pd->pts;
+    page_t *pd = dir->pts;
 
     if(!pd[pdi].present) {
         if(!(flags & VMEM_GET_CREATE)) goto not_found;
@@ -380,6 +380,17 @@ page_t *vmem_get_page(uintptr_t vaddr, unsigned flags) {
     return pt + pti;
 not_found:
     return NULL;
+}
+
+/**
+ * Get the page for a given virtual address from the current page directory.
+ *
+ * If an intermediate table is not found and the VMEM_GET_CREATE flag is set, it
+ * will be allocated (with user mode access if VMEM_GET_KERNEL is not set).
+ * Otherwise NULL is returned.
+ */
+page_t *vmem_get_page(uintptr_t vaddr, unsigned flags) {
+    return vmem_get_page_other(this_core->current_pd, vaddr, flags);
 }
 
 /**
@@ -455,8 +466,7 @@ int vmem_validate_user_ptr(void *vaddr, size_t sz, unsigned flags) {
     uintptr_t page_end = end >> PAGE_BITS;
 
     for(uintptr_t page = page_base; page <= page_end; page++) {
-        /* TODO: this_core->current_proc->pd */
-        page_t *page_entry = vmem_get_page(page, 0);
+        page_t *page_entry = vmem_get_page_other(this_core->current_proc->pd, page << PAGE_BITS, 0);
 
         if(!page_entry) return 0;
         if(!page_entry->present) return 0;

@@ -19,6 +19,7 @@ void ord_arr_place(ord_arr_t *out, void *addr, size_t max_size, int (*compar)(or
 void ord_arr_destroy(ord_arr_t *array);
 void ord_arr_insert(ord_arr_t *array, ord_arr_type_t el);
 ord_arr_type_t ord_arr_get(ord_arr_t *array, size_t i);
+size_t ord_arr_index(ord_arr_t *array, ord_arr_type_t el);
 void ord_arr_remove(ord_arr_t *array, size_t i);
 
 #endif // KERNEL_ORDERED_ARRAY_H_

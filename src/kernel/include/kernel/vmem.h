@@ -38,6 +38,7 @@
 /* heap types */
 typedef struct {
     uint32_t magic;
+    uint8_t align; /* aligned on 1<<align boundaries */
     uint8_t hole;
     size_t size;
 } vmem_header_t;
@@ -68,6 +69,7 @@ void     *vmem_map_vaddr(uintptr_t paddr);
 void     *vmem_map_vaddr_n(uintptr_t paddr, size_t sz);
 void      vmem_frame_free(page_t *page);
 uintptr_t vmem_get_paddr(page_t *dir, uintptr_t vaddr);
+page_t   *vmem_get_page_other(page_directory_t *dir, uintptr_t vaddr, unsigned flags);
 page_t   *vmem_get_page(uintptr_t vaddr, unsigned flags);
 
 page_directory_t *vmem_clone_dir(page_directory_t *src);
@@ -79,6 +81,7 @@ int vmem_validate_user_ptr(void *vaddr, size_t sz, unsigned flags);
 /* heap */
 void  vmem_heap_create(vmem_heap_t *heap, void *start, void *end, void *max);
 void *vmem_heap_alloc(vmem_heap_t *heap, size_t size, uint8_t align);
+void *vmem_heap_realloc(vmem_heap_t *heap, void *old, size_t size);
 void  vmem_heap_free(vmem_heap_t *heap, void *p);
 void  vmem_heap_dump(vmem_heap_t *heap);
 

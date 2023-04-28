@@ -5,18 +5,19 @@
 
 _BEGIN_C_HEADER
 
-#define O_ACCMODE   0x0007
-#define O_RDONLY    0x0000
-#define O_WRONLY    0x0001
-#define O_RDWR      0x0002
-#define O_APPEND    0x0008
-#define O_CREAT     0x0200
-#define O_TRUNC     0x0400
-#define O_EXCL      0x0800
-#define O_NOFOLLOW  0x1000
-#define O_PATH      0x2000
-#define O_NONBLOCK  0x4000
-#define O_DIRECTORY 0x8000
+#define O_ACCMODE   07
+#define O_RDONLY    00
+#define O_WRONLY    01
+#define O_RDWR      02
+#define O_PATH      03
+
+#define O_APPEND    000010
+#define O_CREAT     001000
+#define O_TRUNC     002000
+#define O_EXCL      004000
+#define O_NOFOLLOW  010000
+#define O_NONBLOCK  020000
+#define O_DIRECTORY 040000
 
 #define F_GETFD  1
 #define F_SETFD  2

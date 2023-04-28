@@ -4,6 +4,7 @@
 #include <kernel/vmem.h>
 #include <kernel/kmem.h>
 #include <kernel/pci.h>
+#include <kernel/syscall.h>
 #include <string.h>
 #include <stdio.h>
 #include <errno.h>
@@ -23,8 +24,7 @@
 #define QEMU_MMIO_VIRTX    0x0c
 #define QEMU_MMIO_VIRTY    0x0e
 
-/* TODO: syscalls + signals, because now this does nothing */
-#define validate(ptr) vmem_validate_user_ptr(ptr, 1, 0)
+#define validate(ptr) ptr_validate(ptr)
 
 static fs_node_t *vga_text_dev, *fb_dev;
 
