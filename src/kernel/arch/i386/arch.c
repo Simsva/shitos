@@ -1,6 +1,5 @@
 #include <kernel/arch/i386/arch.h>
 #include <kernel/arch/i386/gdt.h>
-#include <kernel/arch/i386/idt.h>
 #include <features.h>
 
 /**
@@ -58,4 +57,39 @@ void arch_enter_user(uintptr_t entry, int argc, char *const *argv, int envc, cha
          * them on the stack */
            "D"(argc), "S"(argv), "d"(envc), "c"(envp)
     );
+}
+
+/**
+ * Arch-indepentend syscall things.
+ */
+void arch_syscall_ret(struct int_regs *r, long ret) {
+    r->eax = ret;
+}
+
+long arch_syscall_num(struct int_regs *r) {
+    return (long)r->eax;
+}
+
+long arch_syscall_arg0(struct int_regs *r) {
+    return (long)r->ebx;
+}
+
+long arch_syscall_arg1(struct int_regs *r) {
+    return (long)r->ecx;
+}
+
+long arch_syscall_arg2(struct int_regs *r) {
+    return (long)r->edx;
+}
+
+long arch_syscall_arg3(struct int_regs *r) {
+    return (long)r->esi;
+}
+
+long arch_syscall_arg4(struct int_regs *r) {
+    return (long)r->edi;
+}
+
+long arch_syscall_arg5(struct int_regs *r) {
+    return (long)r->ebp;
 }
