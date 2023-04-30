@@ -76,7 +76,7 @@ page_directory_t *vmem_clone_dir(page_directory_t *src);
 void              vmem_set_dir(page_directory_t *dir);
 void              vmem_free_dir(page_directory_t *dir);
 
-int vmem_validate_user_ptr(void *vaddr, size_t sz, unsigned flags);
+int vmem_validate_user_ptr(const void *vaddr, size_t sz, unsigned flags);
 
 /* heap */
 void  vmem_heap_create(vmem_heap_t *heap, void *start, void *end, void *max);

@@ -456,7 +456,7 @@ void vmem_free_dir(page_directory_t *dir);
 /**
  * Check if a pointer is accessable in user mode in the current page directory.
  */
-int vmem_validate_user_ptr(void *vaddr, size_t sz, unsigned flags) {
+int vmem_validate_user_ptr(const void *vaddr, size_t sz, unsigned flags) {
     if(vaddr == NULL && !(flags & VMEM_PTR_FLAG_NULL)) return 0;
 
     uintptr_t base = (uintptr_t)vaddr;

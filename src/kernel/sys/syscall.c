@@ -11,7 +11,7 @@
 
 typedef long (*syscall_fn)(long, long, long, long, long, long);
 
-int ptr_validate(void *ptr) {
+int ptr_validate(const void *ptr) {
     if(ptr) {
         if(!PTR_INRANGE(ptr)) {
             /* TODO: SIGSEGV */
@@ -32,8 +32,6 @@ long sys_open(const char *path, unsigned flags, mode_t mode) {
 
     PTR_VALIDATE(path);
     if(!path) return -EFAULT;
-
-    printf("open(\"%s\", %#o, %#o)\n", path, flags, mode);
 
     fs_node_t *node = kopen(path, flags);
 
@@ -100,15 +98,16 @@ close_ret:
 }
 
 long sys_close(int fd) {
-    printf("close(%d)\n", fd);
+    if(!FD_CHECK(fd)) return -EBADFD;
+
+    fs_close(FD_ENTRY(fd));
+    FD_ENTRY(fd) = NULL;
     return 0;
 }
 
 long sys_read(int fd, char *buf, size_t sz) {
     if(!FD_CHECK(fd)) return -EBADFD;
     PTR_CHECK(buf, sz, VMEM_PTR_FLAG_WRITE);
-
-    printf("read(%d, %p, %zu)\n", fd, buf, sz);
 
     fs_node_t *node = FD_ENTRY(fd);
     if(!(FD_MODE(fd) & R_OK)) return -EACCES;
@@ -120,13 +119,30 @@ long sys_read(int fd, char *buf, size_t sz) {
 }
 
 long sys_write(int fd, const char *buf, size_t sz) {
-    printf("write(%d, %p, %zu)\n", fd, buf, sz);
-    return 0;
+    if(!FD_CHECK(fd)) return -EBADFD;
+    PTR_CHECK(buf, sz, 0);
+
+    fs_node_t *node = FD_ENTRY(fd);
+    if(!(FD_MODE(fd) & W_OK)) return -EACCES;
+    ssize_t out = fs_write(node, FD_OFFSET(fd), sz, (uint8_t *)buf);
+    if(out < 0) return out;
+    FD_OFFSET(fd) += out;
+
+    return (long)out;
 }
 
 long sys_seek(int fd, long off, int whence) {
-    printf("seek(%d, %ld, %d)\n", fd, off, whence);
-    return 0;
+    if(!FD_CHECK(fd)) return -EBADFD;
+    if(FS_ISCHR(FD_ENTRY(fd)->flags) || FS_ISFIFO(FD_ENTRY(fd)->flags)
+       || FS_ISSOCK(FD_ENTRY(fd)->flags))
+        return -ESPIPE;
+
+    switch(whence) {
+    case SEEK_SET: return FD_OFFSET(fd) = off;
+    case SEEK_CUR: return FD_OFFSET(fd) += off;
+    case SEEK_END: return FD_OFFSET(fd) = FD_ENTRY(fd)->sz + off;
+    default:       return -EINVAL;
+    }
 }
 
 /* this system should work unless we use

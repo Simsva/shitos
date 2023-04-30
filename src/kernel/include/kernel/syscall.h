@@ -17,11 +17,11 @@
 #define PTR_INRANGE(ptr) \
     ((uintptr_t)(ptr) > this_core->current_proc->entry && \
     ((uintptr_t)(ptr) < KERNEL_MAP))
-#define PTR_VALIDATE(ptr) { if(ptr_validate((void *)(ptr))) return -EINVAL; }
+#define PTR_VALIDATE(ptr) { if(ptr_validate((const void *)(ptr))) return -EINVAL; }
 #define PTR_CHECK(ptr, sz, flags) \
     { if(!vmem_validate_user_ptr(ptr, sz, flags)) return -EFAULT; }
 
-int ptr_validate(void *ptr);
+int ptr_validate(const void *ptr);
 
 void _syscall_handler(struct int_regs *r);
 
