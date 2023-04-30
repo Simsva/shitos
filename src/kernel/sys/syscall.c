@@ -145,6 +145,39 @@ long sys_seek(int fd, long off, int whence) {
     }
 }
 
+/* AKA random hacks, the syscall */
+long sys_sysfunc(long request, void *args) {
+    switch(request) {
+    case 0: /* malloc */
+        PTR_VALIDATE(args);
+        return this_core->current_proc->heap.start
+            ? (long)vmem_heap_alloc((vmem_heap_t *)&this_core->current_proc->heap,
+                                    *(size_t *)args, 0)
+            : 0;
+    case 1: /* realloc */
+        PTR_VALIDATE(args);
+        return this_core->current_proc->heap.start
+            ? (long)vmem_heap_realloc((vmem_heap_t *)&this_core->current_proc->heap,
+                                      (void *)((uintptr_t *)args)[0],
+                                      (size_t)((uintptr_t *)args)[1])
+            : 0;
+    case 2: /* free */
+        PTR_VALIDATE(args);
+        if(this_core->current_proc->heap.start)
+            vmem_heap_free((vmem_heap_t *)&this_core->current_proc->heap,
+                           *(void **)args);
+        return 0;
+    case 3: /* vmem_heap_dump */
+        if(this_core->current_proc->heap.start)
+            vmem_heap_dump((vmem_heap_t *)&this_core->current_proc->heap);
+        return 0;
+
+    default:
+        printf("Bad sysfunc: %ld\n", request);
+        return -EINVAL;
+    }
+}
+
 /* this system should work unless we use
  * floating point arguments (which we don't) */
 #define SYSCALL(fn) ((syscall_fn)(uintptr_t)(fn))
@@ -155,6 +188,7 @@ static const syscall_fn syscalls[NUM_SYSCALLS] = {
     [SYS_read]      = SYSCALL(sys_read),
     [SYS_write]     = SYSCALL(sys_write),
     [SYS_seek]      = SYSCALL(sys_seek),
+    [SYS_sysfunc]   = SYSCALL(sys_sysfunc),
 };
 #undef SYSCALL
 

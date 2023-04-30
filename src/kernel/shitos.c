@@ -63,14 +63,6 @@ void kmain(struct kernel_args *args) {
         printf("\n");
     }
 
-    {
-        fs_node_t *file = kopen("/usr/include/_cheader.h", 0);
-        uint8_t buf[file->sz+1];
-        fs_read(file, 0, file->sz, buf);
-        buf[file->sz] = '\0';
-        printf("%s", buf);
-    }
-
     /* call init */
     const char *init_argv[] = { "/bin/init", };
     binfmt_system(init_argv[0], 1, (char *const *)init_argv, NULL);

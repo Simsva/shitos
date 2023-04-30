@@ -18,14 +18,16 @@ static int vmem_header_compar(ord_arr_type_t a, ord_arr_type_t b) {
     return ((vmem_header_t *)a)->size < ((vmem_header_t *)b)->size;
 }
 
-void vmem_heap_create(vmem_heap_t *heap, void *start, void *end, void *max) {
+void vmem_heap_create(vmem_heap_t *heap, void *start, void *end, void *max, size_t index_sz, uint8_t kernel) {
     /* vmem_heap_t *heap = (vmem_heap_t *)kmalloc(sizeof(vmem_heap_t)); */
 
-    assert((uint32_t)start % PAGE_SIZE == 0);
-    assert((uint32_t)end % PAGE_SIZE == 0);
+    assert((uintptr_t)start % PAGE_SIZE == 0);
+    assert((uintptr_t)end % PAGE_SIZE == 0);
 
-    ord_arr_place(&heap->index, start, VMEM_HEAP_INDEX_SZ, &vmem_header_compar);
-    start += sizeof(ord_arr_type_t) * VMEM_HEAP_INDEX_SZ;
+    heap->kernel = kernel;
+
+    ord_arr_place(&heap->index, start, index_sz, &vmem_header_compar);
+    start += sizeof(ord_arr_type_t) * index_sz;
 
     /* align start */
     start = (void *)((uintptr_t)(start + PAGE_SIZE-1) & ~(PAGE_SIZE-1));
@@ -54,13 +56,12 @@ static void vmem_heap_expand(vmem_heap_t *heap, size_t new_sz) {
     assert(new_sz > (size_t)(heap->end - heap->start));
     assert(heap->start + new_sz <= heap->max);
 
-    size_t old_sz = heap->end - heap->start;
-    while(old_sz < new_sz) {
+    unsigned get_flags = VMEM_GET_CREATE, alloc_flags = VMEM_FLAG_WRITE;
+    if(heap->kernel) get_flags |= VMEM_GET_KERNEL, alloc_flags |= VMEM_FLAG_KERNEL;
+
+    for(size_t old_sz = heap->end - heap->start; old_sz < new_sz; old_sz += PAGE_SIZE)
         vmem_frame_alloc(vmem_get_page((uintptr_t)heap->start+old_sz,
-                                       VMEM_GET_CREATE|VMEM_GET_KERNEL),
-                         VMEM_FLAG_KERNEL|VMEM_FLAG_KERNEL);
-        old_sz += PAGE_SIZE;
-    }
+                                       get_flags), alloc_flags);
     heap->end = heap->start + new_sz;
 }
 
@@ -289,7 +290,7 @@ void *vmem_heap_realloc(vmem_heap_t *heap, void *old, size_t size) {
         /* after expansion we are guaranteed to fit a new hole */
         vmem_header_t *hole = (void *)new_ftr + sizeof(vmem_footer_t);
         hole->magic = VMEM_HEAP_MAGIC;
-        hole->hole = 0;
+        hole->hole = 1;
         hole->size = (uintptr_t)heap->end - (uintptr_t)hole;
         hole->align = 0;
 
@@ -297,14 +298,14 @@ void *vmem_heap_realloc(vmem_heap_t *heap, void *old, size_t size) {
         hole_ftr->magic = VMEM_HEAP_MAGIC;
         hole_ftr->hdr = hole;
 
-        ord_arr_index(&heap->index, hole);
+        ord_arr_insert(&heap->index, hole);
 
         return old;
     }
 
     if(rhdr->hole) {
         /* merge with right hole */
-        vmem_footer_t *rftr = (void *)rhdr + rhdr->size;
+        vmem_footer_t *rftr = (void *)rhdr + rhdr->size - sizeof(vmem_footer_t);
 
         size_t extra_size = size - hdr->size;
         size_t i = ord_arr_index(&heap->index, rhdr);
@@ -325,7 +326,7 @@ void *vmem_heap_realloc(vmem_heap_t *heap, void *old, size_t size) {
 
             vmem_header_t *hole = (void *)new_ftr + sizeof(vmem_footer_t);
             hole->magic = VMEM_HEAP_MAGIC;
-            hole->hole = 0;
+            hole->hole = 1;
             hole->size = (uintptr_t)rftr + sizeof(vmem_footer_t) - (uintptr_t)hole;
             hole->align = 0;
 
@@ -347,7 +348,7 @@ void *vmem_heap_realloc(vmem_heap_t *heap, void *old, size_t size) {
                                       hdr->align);
     memcpy(new_alloc, old, hdr->size - sizeof(vmem_header_t)
                                      - sizeof(vmem_footer_t));
-    kfree(old);
+    vmem_heap_free(heap, old);
     return new_alloc;
 }
 
@@ -401,6 +402,8 @@ void vmem_heap_dump(vmem_heap_t *heap) {
 
     while((void *)hdr < heap->end) {
         if(hdr->magic != VMEM_HEAP_MAGIC) goto magic_err;
+        vmem_footer_t *ftr = (void *)hdr + hdr->size - sizeof(vmem_footer_t);
+        if(ftr->magic != VMEM_HEAP_MAGIC) goto magic_err;
         printf("%p\talloc:%d sz:%#zx\trsz:%#zx\n",
                hdr, !hdr->hole,
                hdr->size - sizeof(vmem_header_t) - sizeof(vmem_footer_t),

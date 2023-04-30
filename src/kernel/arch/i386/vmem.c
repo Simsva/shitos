@@ -77,7 +77,7 @@ static void reload_pd(void);
  */
 void vmem_init(void) {
     vmem_heap_create(&kheap, kmem_head, kmem_head+VMEM_HEAP_INITIAL_SZ,
-                     (void *)0xcffff000);
+                     (void *)0xcffff000, VMEM_HEAP_INDEX_SZ, 1);
 
     map_pages_index = hashmap_create_int(128);
     map_pages_index->value_free = NULL;

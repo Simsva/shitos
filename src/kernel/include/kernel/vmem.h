@@ -51,6 +51,7 @@ typedef struct {
 typedef struct {
     ord_arr_t index;
     void *start, *end, *max;
+    uint8_t kernel;
 } vmem_heap_t;
 
 /* kernel heap */
@@ -79,7 +80,7 @@ void              vmem_free_dir(page_directory_t *dir);
 int vmem_validate_user_ptr(const void *vaddr, size_t sz, unsigned flags);
 
 /* heap */
-void  vmem_heap_create(vmem_heap_t *heap, void *start, void *end, void *max);
+void  vmem_heap_create(vmem_heap_t *heap, void *start, void *end, void *max, size_t index_sz, uint8_t kernel);
 void *vmem_heap_alloc(vmem_heap_t *heap, size_t size, uint8_t align);
 void *vmem_heap_realloc(vmem_heap_t *heap, void *old, size_t size);
 void  vmem_heap_free(vmem_heap_t *heap, void *p);

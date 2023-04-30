@@ -6,7 +6,12 @@
 #include <errno.h>
 #include <features.h>
 
-#define USER_STACK_SZ 0x80000
+/* just randomly chosen numbers */
+#define USER_STACK_SZ       0x20000
+#define USER_HEAP_SZ        0x40000
+/* NOTE: maybe let the heap grow up to the stack? */
+#define USER_HEAP_MAX_SZ    0x80000
+#define USER_HEAP_INDEX_SZ  0x400
 
 #include <kernel/arch/i386/arch.h>
 
@@ -35,7 +40,7 @@ int elf_exec(__unused const char *path, fs_node_t *file, int argc, char *const a
     if(file->mask & S_ISUID)
         this_core->current_proc->euid = file->uid;
 
-    uintptr_t heap_base = 0, exec_base = UINTPTR_MAX;
+    uintptr_t heap_base = 0;
 
     /* load program headers */
     /* TODO: dynamic segments */
@@ -53,15 +58,20 @@ int elf_exec(__unused const char *path, fs_node_t *file, int argc, char *const a
             /* place the heap after the last segment */
             if(phdr.p_vaddr + phdr.p_memsz > heap_base)
                 heap_base = phdr.p_vaddr + phdr.p_memsz;
-
-            /* locate the beginning of the ELF */
-            if(phdr.p_vaddr < exec_base)
-                exec_base = phdr.p_vaddr;
         }
     }
 
-    /* align heap */
-    this_core->current_proc->heap = (heap_base + PAGE_SIZE-1) & ~(PAGE_SIZE-1);
+    /* create heap */
+    heap_base = (heap_base + PAGE_SIZE-1) & ~(PAGE_SIZE-1);
+    for(uintptr_t addr = heap_base; addr < heap_base + USER_HEAP_SZ; addr += PAGE_SIZE)
+        vmem_frame_alloc(vmem_get_page(addr, VMEM_GET_CREATE), VMEM_FLAG_WRITE);
+
+    vmem_heap_create((vmem_heap_t *)&this_core->current_proc->heap,
+                     (void *)heap_base,
+                     (void *)heap_base + USER_HEAP_SZ,
+                     (void *)heap_base + USER_HEAP_MAX_SZ,
+                     USER_HEAP_INDEX_SZ, 0);
+
     this_core->current_proc->entry = (uintptr_t)hdr.e_entry;
 
     fs_close(file);

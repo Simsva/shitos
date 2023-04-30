@@ -7,7 +7,8 @@
 #define SYS_read         3
 #define SYS_write        4
 #define SYS_seek         5
+#define SYS_sysfunc      6
 
-#define NUM_SYSCALLS     6
+#define NUM_SYSCALLS     7
 
 #endif // SYSCALL_NUMS_H_

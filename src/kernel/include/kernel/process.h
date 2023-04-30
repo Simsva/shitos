@@ -38,7 +38,8 @@ typedef struct process {
     char *name, **cmdline;
 
     uintptr_t sp, bp, ip;
-    uintptr_t user_stack, kernel_stack, heap;
+    uintptr_t user_stack, kernel_stack;
+    vmem_heap_t heap;
     uintptr_t entry;
 
     char *wd_path;

@@ -1,5 +1,6 @@
 #include <features.h>
 #include <fcntl.h>
+#include <stdlib.h>
 #include <syscall.h>
 
 int main(__unused int argc, __unused char *argv[]) {
@@ -8,12 +9,22 @@ int main(__unused int argc, __unused char *argv[]) {
     syscall_open("/dev/console", O_WRONLY, 0); /* fd 1: stdout */
     syscall_open("/dev/console", O_WRONLY, 0); /* fd 2: stderr */
 
-    int fd = syscall_open("/usr/include/_cheader.h", O_RDWR, 0);
-    char buf[3] = "aa";
-    syscall_read(fd, buf, sizeof buf);
-    syscall_seek(fd, 10, 0);
-    syscall_write(fd, buf, sizeof buf);
-    syscall_close(fd);
+    char nl = '\n';
+
+    syscall_sysfunc(3, NULL);
+    volatile char *ptr = malloc(10);
+    volatile char *ptr2 = malloc(5);
+
+    syscall_write(1, &nl, 1);
+    syscall_sysfunc(3, NULL);
+    ptr = realloc((void *)ptr, 20);
+
+    syscall_write(1, &nl, 1);
+    syscall_sysfunc(3, NULL);
+    ptr2 = realloc((void *)ptr2, 10);
+
+    syscall_write(1, &nl, 1);
+    syscall_sysfunc(3, NULL);
 
     return 0;
 }
