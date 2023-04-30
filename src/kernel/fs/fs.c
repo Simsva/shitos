@@ -2,6 +2,7 @@
 
 #include <kernel/hashmap.h>
 #include <kernel/kmem.h>
+#include <kernel/process.h>
 #include <sys/stat.h>
 #include <features.h>
 #include <fcntl.h>
@@ -781,8 +782,7 @@ static fs_node_t *kopen_recur(const char *file, unsigned flags, unsigned symlink
 
 /* like open(2), but returns an fs_node instead of a fd */
 fs_node_t *kopen(const char *path, unsigned flags) {
-    /* TODO: cwd that is not hardcoded to "/" maybe? */
-    return kopen_recur(path, flags, 0, "/");
+    return kopen_recur(path, flags, 0, this_core->current_proc->wd_path);
 }
 
 /**

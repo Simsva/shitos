@@ -1,5 +1,6 @@
 bits 32
 
+extern __stdio_init
 extern _init
 extern main
 extern exit
@@ -25,6 +26,7 @@ _start:
     ;; pop edx
     ;; pop ecx
 
+    call __stdio_init
     call main
 
     push eax

@@ -29,6 +29,7 @@ void kmain(struct kernel_args *args) {
     memcpy(&kernel_args, args, sizeof kernel_args);
 
     vfs_install();
+    process_init();
     vfs_map_directory("/dev");
     console_install();
     ide_init();
@@ -38,7 +39,6 @@ void kmain(struct kernel_args *args) {
     zero_install();
     random_install();
     ps2hid_install();
-    process_init();
 
     /* TODO: automatically detect devices somehow */
     vfs_mount_type("dospart", "/dev/ada", NULL);

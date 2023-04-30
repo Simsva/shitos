@@ -20,6 +20,12 @@ _BEGIN_C_HEADER
 #undef  EOF
 #define EOF (-1)
 
+#define BUFSIZ 1024
+
+#define _IONBF 2
+#define _IOLBF 1
+#define _IOFBF 0
+
 #define SEEK_SET 0  /* seek from beginning of file */
 #define SEEK_CUR 1  /* seek from current position */
 #define SEEK_END 2  /* seek from end of file */
@@ -27,16 +33,20 @@ _BEGIN_C_HEADER
 struct __FILE;
 
 typedef struct __FILE {
-    unsigned flags;
     int (*close)(struct __FILE *);
     size_t (*read)(struct __FILE *, unsigned char *, size_t);
     size_t (*write)(struct __FILE *, const unsigned char *, size_t);
-    off_t (*seek)(struct __FILE *, off_t, int);
+    int (*seek)(struct __FILE *, off_t, int);
+
     unsigned char *buf;
-    size_t buf_size;
+    size_t buf_i, buf_sz;
+    int buf_mode;
+
     int fd;
-    int mode;
+
     off_t off;
+
+    struct __FILE *prev, *next;
 } FILE;
 
 extern FILE *const stdin;
@@ -47,10 +57,21 @@ extern FILE *const stderr;
 #define stdout (stdout)
 #define stderr (stderr)
 
+int fputc(int, FILE *);
 int putc(int, FILE *);
 int putchar(int);
 
+int fputs(const char *__restrict, FILE *__restrict);
 int puts(const char *);
+
+FILE *fopen(const char *__restrict, const char *__restrict);
+int fclose(FILE *);
+size_t fread(void *__restrict, size_t, size_t, FILE *__restrict);
+size_t fwrite(const void *__restrict, size_t, size_t, FILE *__restrict);
+int fflush(FILE *);
+int fseek(FILE *, long, int);
+long ftell(FILE *);
+void rewind(FILE *);
 
 int printf(const char *__restrict, ...) __attribute__((format(printf, 1, 2)));
 int fprintf(FILE *__restrict, const char *__restrict, ...) __attribute__((format(printf, 2, 3)));
@@ -62,15 +83,8 @@ int vfprintf(FILE *__restrict, const char *__restrict, va_list);
 int vsprintf(char *__restrict, const char *__restrict, va_list);
 int vsnprintf(char *__restrict, size_t, const char *__restrict, va_list);
 
-/* for GCC, TODO: implement */
-int fclose(FILE *);
-int fflush(FILE *);
-FILE *fopen(const char *, const char *);
-size_t fread(void *, size_t, size_t, FILE *);
-int fseek(FILE *, long, int);
-long ftell(FILE *);
-size_t fwrite(const void *, size_t, size_t, FILE *);
-void setbuf(FILE *, char *);
+int setvbuf(FILE *__restrict, char *__restrict, int, size_t);
+void setbuf(FILE *__restrict, char *__restrict);
 
 _END_C_HEADER
 

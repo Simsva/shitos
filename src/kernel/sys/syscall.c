@@ -131,6 +131,7 @@ long sys_write(int fd, const char *buf, size_t sz) {
     return (long)out;
 }
 
+/* TODO: prevent negative offs? */
 long sys_seek(int fd, long off, int whence) {
     if(!FD_CHECK(fd)) return -EBADFD;
     if(FS_ISCHR(FD_ENTRY(fd)->flags) || FS_ISFIFO(FD_ENTRY(fd)->flags)

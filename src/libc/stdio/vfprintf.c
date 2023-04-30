@@ -1,4 +1,4 @@
-#include <stdio.h>
+#include "stdio_impl.h"
 #include <stddef.h>
 #include <stdarg.h>
 #include <string.h>
@@ -132,7 +132,7 @@ static int getint(char **s) {
 }
 
 static void output(FILE *f, const char *s, int l) {
-    if(!f) return;
+    if(!f || !f->write) return;
     f->write(f, (uint8_t *)s, l);
 }
 
@@ -607,7 +607,6 @@ static int printf_core(FILE *f, const char *fmt, va_list *ap, union arg *nl_arg,
     if(i <= NL_ARGMAX) goto inval;
     return 1;
 
-    /* TODO: errno */
 inval:
     errno = EINVAL;
     return EOF;
