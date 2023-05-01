@@ -48,6 +48,7 @@ _Noreturn void _Exit(int);
 _Noreturn void abort(void);
 int atexit(void (*)(void));
 char *getenv(const char *);
+int system(const char *);
 
 _END_C_HEADER
 

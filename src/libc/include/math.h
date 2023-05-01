@@ -117,6 +117,10 @@ __ISREL_DEF(greaterequall, >=, long double)
 #define isgreater(x, y)         __tg_pred_2(x, y, __isgreater)
 #define isgreaterequal(x, y)    __tg_pred_2(x, y, __isgreaterequal)
 
+double      fabs(double);
+float       fabsf(float);
+long double fabsl(long double);
+
 double      frexp(double, int *);
 float       frexpf(float, int *);
 long double frexpl(long double, int *);

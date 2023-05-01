@@ -12,6 +12,9 @@ int ffs(int);
 int ffsl(long);
 int ffsll(long long);
 
+int strcasecmp(const char *, const char *);
+int strncasecmp(const char *, const char *, size_t);
+
 _END_C_HEADER
 
 #endif // STRINGS_H_
