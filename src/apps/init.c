@@ -11,14 +11,10 @@ int main(__unused int argc, __unused char *argv[]) {
     syscall_open("/dev/console", O_WRONLY, 0); /* fd 2: stderr */
 
     FILE *file = fopen("/usr/include/_cheader.h", "r");
-    fseek(file, 0, SEEK_END);
-    char buf[ftell(file)];
-    rewind(file);
-
-    fread(buf, 1, sizeof buf - 1, file);
-    buf[sizeof buf - 1] = '\0';
-    puts(buf);
-
+    char buf[32];
+    while(fgets(buf, sizeof buf, file))
+        printf("%s", buf);
     fclose(file);
+
     return EXIT_SUCCESS;
 }

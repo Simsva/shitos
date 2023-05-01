@@ -45,6 +45,7 @@ typedef struct __FILE {
     int fd;
 
     off_t off;
+    int eof, error;
 
     struct __FILE *prev, *next;
 } FILE;
@@ -64,6 +65,13 @@ int putchar(int);
 int fputs(const char *__restrict, FILE *__restrict);
 int puts(const char *);
 
+int fgetc(FILE *);
+int getc(FILE *);
+int getchar(void);
+
+char *fgets(char *__restrict, int, FILE *__restrict);
+char *gets(char *);
+
 FILE *fopen(const char *__restrict, const char *__restrict);
 int fclose(FILE *);
 size_t fread(void *__restrict, size_t, size_t, FILE *__restrict);
@@ -72,6 +80,13 @@ int fflush(FILE *);
 int fseek(FILE *, long, int);
 long ftell(FILE *);
 void rewind(FILE *);
+
+void clearerr(FILE *);
+int feof(FILE *);
+int ferror(FILE *);
+
+int rename(const char *, const char*);
+int remove(const char *);
 
 int printf(const char *__restrict, ...) __attribute__((format(printf, 1, 2)));
 int fprintf(FILE *__restrict, const char *__restrict, ...) __attribute__((format(printf, 2, 3)));

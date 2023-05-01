@@ -10,7 +10,7 @@ ALL_SRC_ASM=$(wildcard *.asm)
 ALL_OBJ=$(ALL_SRC_C:.c=_c.o) $(ALL_SRC_ASM:.asm=_asm.o)
 ALL_SRC_MK=$(ALL_OBJ:.o=.d)
 
-# XXX: apps do not automatically recompile when changing crts
+# XXX: apps do not automatically recompile when changing crts (or libc)
 # CRTS=$(wildcard $(SYSROOT)/$(SYSLIBDIR)/crt*.o)
 
 BINDIR=$(SYSROOT)/$(EXEC_PREFIX)/bin
