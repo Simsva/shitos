@@ -1,5 +1,6 @@
 #include "stdio_impl.h"
 
+/* DEPRECATED */
 char *gets(char *s) {
     int c;
     char *r = s;

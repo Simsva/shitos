@@ -2,6 +2,7 @@
 #define SYS_STAT_H_
 
 #include <_cheader.h>
+#include <sys/types.h>
 
 _BEGIN_C_HEADER
 
@@ -41,6 +42,8 @@ _BEGIN_C_HEADER
 #define S_IWOTH 00002
 #define S_IXOTH 00001
 #define S_IRWXO 00007
+
+int mkdir(const char *, mode_t);
 
 _END_C_HEADER
 

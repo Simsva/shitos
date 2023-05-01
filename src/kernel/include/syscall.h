@@ -95,6 +95,8 @@ DECL_SYSCALL3(read,       int, char *, size_t);
 DECL_SYSCALL3(write,      int, const char *, size_t);
 DECL_SYSCALL3(seek,       int, long, int);
 DECL_SYSCALL2(sysfunc,    long, void *);
+DECL_SYSCALL2(mknod,      const char *, mode_t);
+DECL_SYSCALL1(unlink,     const char *);
 
 _END_C_HEADER
 

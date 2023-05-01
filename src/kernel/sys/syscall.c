@@ -45,7 +45,7 @@ long sys_open(const char *path, unsigned flags, mode_t mode) {
     if(!node && (flags & O_CREAT)) {
         /* TODO: check dir permission, EACCESS */
         int err;
-        if(!(err = fs_mknod(path, (mode & 0777) | S_IFREG)))
+        if(!(err = fs_mknod(path, (mode & 07777) | S_IFREG)))
             node = kopen(path, flags);
         else
             return err;
@@ -179,6 +179,20 @@ long sys_sysfunc(long request, void *args) {
     }
 }
 
+long sys_mknod(const char *path, mode_t mode) {
+    PTR_VALIDATE(path);
+    if(!path) return -EFAULT;
+
+    return (long)fs_mknod(path, mode);
+}
+
+long sys_unlink(const char *path) {
+    PTR_VALIDATE(path);
+    if(!path) return -EFAULT;
+
+    return (long)fs_unlink(path);
+}
+
 /* this system should work unless we use
  * floating point arguments (which we don't) */
 #define SYSCALL(fn) ((syscall_fn)(uintptr_t)(fn))
@@ -190,6 +204,8 @@ static const syscall_fn syscalls[NUM_SYSCALLS] = {
     [SYS_write]     = SYSCALL(sys_write),
     [SYS_seek]      = SYSCALL(sys_seek),
     [SYS_sysfunc]   = SYSCALL(sys_sysfunc),
+    [SYS_mknod]     = SYSCALL(sys_mknod),
+    [SYS_unlink]    = SYSCALL(sys_unlink),
 };
 #undef SYSCALL
 

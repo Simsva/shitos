@@ -128,7 +128,7 @@ int fs_mknod(const char *path, mode_t mode) {
     char *cpath, *basename, *parent;
     int ret = 0;
 
-    get_canon_parent_basename("/", path, &pathsz, &cpath, &parent, &basename);
+    get_canon_parent_basename(this_core->current_proc->wd_path, path, &pathsz, &cpath, &parent, &basename);
 
     if(!parent || !basename) {
         /* root directory */
@@ -181,7 +181,7 @@ int fs_unlink(const char *path) {
     char *cpath, *basename, *parent;
     int ret = 0;
 
-    get_canon_parent_basename("/", path, &pathsz, &cpath, &parent, &basename);
+    get_canon_parent_basename(this_core->current_proc->wd_path, path, &pathsz, &cpath, &parent, &basename);
 
     if(!parent || !basename) {
         /* root directory */
@@ -239,7 +239,7 @@ int fs_link(const char *oldpath, const char *newpath) {
     if(!old) return -ENOENT;
     if(FS_ISDIR(old->flags)) return -EPERM;
 
-    get_canon_parent_basename("/", newpath, &pathsz, &cpath, &parent, &basename);
+    get_canon_parent_basename(this_core->current_proc->wd_path, newpath, &pathsz, &cpath, &parent, &basename);
 
     if(!parent || !basename) {
         /* root directory */
@@ -293,7 +293,7 @@ int fs_symlink(const char *target, const char *path) {
     char *cpath, *basename, *parent;
     int ret = 0;
 
-    get_canon_parent_basename("/", path, &pathsz, &cpath, &parent, &basename);
+    get_canon_parent_basename(this_core->current_proc->wd_path, path, &pathsz, &cpath, &parent, &basename);
 
     if(!parent || !basename) {
         /* root directory */

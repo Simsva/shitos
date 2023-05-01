@@ -29,20 +29,25 @@ div_t div(int, int);
 ldiv_t ldiv(long, long);
 lldiv_t lldiv(long long, long long);
 
+int abs(int);
+long labs(long);
+long long llabs(long long);
+
+double atof(const char *);
+int atoi(const char *);
+long atol(const char *);
+long long atoll(const char *);
+
+_Noreturn void exit(int);
+_Noreturn void _Exit(int);
+
 #define EXIT_SUCCESS 0
 #define EXIT_FAILURE 1
 
 /* for GCC, TODO: implement */
 _Noreturn void abort(void);
 int atexit(void (*)(void));
-int atoi(const char *);
 char *getenv(const char *);
-void *calloc(size_t, size_t);
-int abs(int);
-long labs(long);
-long long llabs(long long);
-_Noreturn void exit(int);
-_Noreturn void _Exit(int);
 
 _END_C_HEADER
 
