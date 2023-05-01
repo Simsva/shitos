@@ -1,6 +1,5 @@
-#include <ctype.h>
+#include <stdlib.h>
 
-double atof(__unused const char *s) {
-    /* NYI */
-    return -1.0;
+double atof(const char *s) {
+    return strtod(s, NULL);
 }

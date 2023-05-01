@@ -38,6 +38,9 @@ int atoi(const char *);
 long atol(const char *);
 long long atoll(const char *);
 
+double strtod(const char *, char **);
+float strtof(const char *, char **);
+
 _Noreturn void exit(int);
 _Noreturn void _Exit(int);
 

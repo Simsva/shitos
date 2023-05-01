@@ -46,6 +46,7 @@ typedef struct __FILE {
 
     off_t off;
     int eof, error;
+    int ungetc;
 
     struct __FILE *prev, *next;
 } FILE;
@@ -68,6 +69,7 @@ int puts(const char *);
 int fgetc(FILE *);
 int getc(FILE *);
 int getchar(void);
+int ungetc(int, FILE *);
 
 char *fgets(char *__restrict, int, FILE *__restrict);
 char *gets(char *);
@@ -97,6 +99,14 @@ int vprintf(const char *__restrict, va_list);
 int vfprintf(FILE *__restrict, const char *__restrict, va_list);
 int vsprintf(char *__restrict, const char *__restrict, va_list);
 int vsnprintf(char *__restrict, size_t, const char *__restrict, va_list);
+
+/* TODO: implement vfscanf */
+int scanf(const char *__restrict, ...);
+int fscanf(FILE *__restrict, const char *__restrict, ...);
+int sscanf(const char *__restrict, const char *__restrict, ...);
+int vscanf(const char *__restrict, va_list);
+int vfscanf(FILE *__restrict, const char *__restrict, va_list);
+int vsscanf(const char *__restrict, const char *__restrict, va_list);
 
 int setvbuf(FILE *__restrict, char *__restrict, int, size_t);
 void setbuf(FILE *__restrict, char *__restrict);

@@ -125,6 +125,10 @@ double      frexp(double, int *);
 float       frexpf(float, int *);
 long double frexpl(long double, int *);
 
+double      pow(double, double);
+float       powf(float, float);
+long double powl(long double, long double);
+
 #if defined(_XOPEN_SOURCE) || defined(_BSD_SOURCE)
 #undef  MAXFLOAT
 #define MAXFLOAT        3.40282346638528859812e+38F

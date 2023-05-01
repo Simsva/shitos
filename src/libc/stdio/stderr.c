@@ -11,6 +11,7 @@ __hidden FILE __stderr_FILE = {
     .seek = __stdio_seek,
     .close = __stdio_close,
     .buf_mode = _IONBF,
+    .ungetc = -1,
 };
 #endif
 

@@ -21,6 +21,7 @@ __hidden FILE __stdout_FILE = {
     .close = __stdio_close,
     .buf_sz = BUFSIZ,
     .buf_mode = _IOLBF,
+    .ungetc = -1,
 };
 #endif
 
