@@ -3,6 +3,11 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <syscall.h>
+#include <stdint.h>
+#include <string.h>
+#include <kernel/video.h>
+
+uint32_t *fb = (void *)0x70000000;
 
 int main(__unused int argc, __unused char *argv[]) {
     /* TODO: /dev/null and fix these later (tty) */
@@ -10,11 +15,10 @@ int main(__unused int argc, __unused char *argv[]) {
     syscall_open("/dev/console", O_WRONLY, 0); /* fd 1: stdout */
     syscall_open("/dev/console", O_WRONLY, 0); /* fd 2: stderr */
 
-    FILE *file = fopen("/usr/include/_cheader.h", "r");
-    char buf[32];
-    while(fgets(buf, sizeof buf, file))
-        printf("%s", buf);
-    fclose(file);
+    FILE *fbfile = fopen("/dev/fb0", "r");
+    syscall_ioctl(fbfile->fd, IOCTL_VID_MAP, &fb);
+    memset(fb, 0xff, 1280*4*10);
 
+    fclose(fbfile);
     return EXIT_SUCCESS;
 }

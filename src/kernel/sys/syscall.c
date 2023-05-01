@@ -193,6 +193,12 @@ long sys_unlink(const char *path) {
     return (long)fs_unlink(path);
 }
 
+long sys_ioctl(int fd, long request, void *argp) {
+    if(!FD_CHECK(fd)) return -EBADFD;
+    PTR_VALIDATE(argp);
+    return fs_ioctl(FD_ENTRY(fd), request, argp);
+}
+
 /* this system should work unless we use
  * floating point arguments (which we don't) */
 #define SYSCALL(fn) ((syscall_fn)(uintptr_t)(fn))
@@ -206,6 +212,7 @@ static const syscall_fn syscalls[NUM_SYSCALLS] = {
     [SYS_sysfunc]   = SYSCALL(sys_sysfunc),
     [SYS_mknod]     = SYSCALL(sys_mknod),
     [SYS_unlink]    = SYSCALL(sys_unlink),
+    [SYS_ioctl]     = SYSCALL(sys_ioctl),
 };
 #undef SYSCALL
 

@@ -31,6 +31,7 @@ static fs_node_t *vga_text_dev, *fb_dev;
 const char *fb_driver_name = NULL;
 uint16_t fb_width = 0, fb_height = 0, fb_depth = 0, fb_stride = 0;
 uint8_t *fb_vid_memory = (uint8_t *)0xe0000000;
+static uintptr_t fb_vid_memory_paddr = 0;
 size_t fb_memsize = 0;
 static void (*fb_set_resolution_impl)(uint16_t w, uint16_t h) = NULL;
 
@@ -80,8 +81,43 @@ static int vga_ioctl(__unused fs_node_t *node, unsigned long request, void *argp
     }
 }
 
-static int fb_ioctl(__unused fs_node_t *node, __unused unsigned long request, __unused void *argp) {
-    return -EINVAL;
+static int fb_ioctl(__unused fs_node_t *node, unsigned long request, void *argp) {
+    switch(request) {
+    case IOCTL_VID_WIDTH:
+        validate(argp);
+        *((size_t *)argp) = fb_width;
+        return 0;
+    case IOCTL_VID_HEIGHT:
+        validate(argp);
+        *((size_t *)argp) = fb_height;
+        return 0;
+    case IOCTL_VID_DEPTH:
+        validate(argp);
+        *((size_t *)argp) = fb_depth;
+        return 0;
+    case IOCTL_VID_STRIDE:
+        validate(argp);
+        *((size_t *)argp) = fb_stride;
+        return 0;
+    case IOCTL_VID_MAP:
+        validate(argp);
+        {
+            uintptr_t fb_user_off;
+            if(*(uintptr_t *)argp == 0) {
+                return -EINVAL;
+            } else {
+                validate((void *)(*(uintptr_t *)argp));
+                fb_user_off = *(uintptr_t *)argp;
+            }
+            for(uintptr_t addr = 0; addr < fb_memsize; addr += PAGE_SIZE) {
+                vmem_frame_map_addr(vmem_get_page(fb_user_off + addr, VMEM_GET_CREATE),
+                                    VMEM_FLAG_WRITE, fb_vid_memory_paddr + addr);
+            }
+        }
+        return 0;
+    default:
+        return -EINVAL;
+    }
 }
 
 static void create_fb_dev(const char *driver) {
@@ -118,6 +154,7 @@ static void qemu_scan_pci(pci_device_t device, uint16_t vid, uint16_t did, void 
             /* map video + mmio memory */
             out[0] = (uintptr_t)vmem_map_vaddr_n(t & 0xfffffff0, s);
             out[1] = (uintptr_t)vmem_map_vaddr(m & 0xfffffff0);
+            out[3] = t & 0xfffffff0;
         }
     }
 }
@@ -172,7 +209,7 @@ static void graphics_install_preset(void) {
 }
 
 static void graphics_install_qemu(void) {
-    uintptr_t vals[3] = {0};
+    uintptr_t vals[4] = {0};
     pci_scan(qemu_scan_pci, -1, vals);
 
     if(!vals[0]) return;
@@ -180,6 +217,7 @@ static void graphics_install_qemu(void) {
     fb_vid_memory = (uint8_t *)vals[0];
     qemu_mmio_mem = (void *)vals[1];
     fb_memsize = vals[2];
+    fb_vid_memory_paddr = vals[3];
 
     uint16_t id = qemu_mmio_in(QEMU_MMIO_ID);
     printf("QEMU BGA: id: %#06x\n", id);

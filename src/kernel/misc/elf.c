@@ -10,7 +10,7 @@
 #define USER_STACK_SZ       0x20000
 #define USER_HEAP_SZ        0x40000
 /* NOTE: maybe let the heap grow up to the stack? */
-#define USER_HEAP_MAX_SZ    0x80000
+#define USER_HEAP_MAX_SZ    0x2000000
 #define USER_HEAP_INDEX_SZ  0x400
 
 #include <kernel/arch/i386/arch.h>

@@ -10,3 +10,4 @@ DEFN_SYSCALL3(seek,       SYS_seek,       int, long, int);
 DEFN_SYSCALL2(sysfunc,    SYS_sysfunc,    long, void *);
 DEFN_SYSCALL2(mknod,      SYS_mknod,      const char *, mode_t);
 DEFN_SYSCALL1(unlink,     SYS_unlink,     const char *);
+DEFN_SYSCALL3(ioctl,      SYS_ioctl,      int, long, void *);

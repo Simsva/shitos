@@ -14,16 +14,16 @@
 #define VGA_TEXT_WIDTH   80
 #define VGA_TEXT_HEIGHT  25
 
-extern const char *fb_driver_name;
-extern uint16_t fb_width, fb_height, fb_depth, fb_stride;
-extern uint8_t *fb_vid_memory;
-extern size_t fb_memsize;
-
 struct video_size {
     uint16_t w, h;
 };
 
 #ifdef _KERNEL
+extern const char *fb_driver_name;
+extern uint16_t fb_width, fb_height, fb_depth, fb_stride;
+extern uint8_t *fb_vid_memory;
+extern size_t fb_memsize;
+
 void fb_set_resolution(uint16_t w, uint16_t h);
 void fb_init(void);
 #endif

@@ -10,7 +10,8 @@
 #define SYS_sysfunc      6
 #define SYS_mknod        7
 #define SYS_unlink       8
+#define SYS_ioctl        9
 
-#define NUM_SYSCALLS     9
+#define NUM_SYSCALLS     10
 
 #endif // SYSCALL_NUMS_H_
