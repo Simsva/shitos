@@ -2,6 +2,7 @@
 
 #include <kernel/hashmap.h>
 #include <kernel/kmem.h>
+#include <kernel/process.h>
 #include <sys/stat.h>
 #include <features.h>
 #include <fcntl.h>
@@ -14,8 +15,6 @@
 
 #define MAX(a,b) ((a) > (b) ? (a) : (b))
 #define MIN(a,b) ((a) < (b) ? (a) : (b))
-
-#define TREE_TO_FS_NODE(tree_node) (((struct vfs_entry *)((tree_node)->value))->file)
 
 tree_t *fs_tree = NULL;
 static hashmap_t *fs_types = NULL;
@@ -129,7 +128,7 @@ int fs_mknod(const char *path, mode_t mode) {
     char *cpath, *basename, *parent;
     int ret = 0;
 
-    get_canon_parent_basename("/", path, &pathsz, &cpath, &parent, &basename);
+    get_canon_parent_basename(this_core->current_proc->wd_path, path, &pathsz, &cpath, &parent, &basename);
 
     if(!parent || !basename) {
         /* root directory */
@@ -182,7 +181,7 @@ int fs_unlink(const char *path) {
     char *cpath, *basename, *parent;
     int ret = 0;
 
-    get_canon_parent_basename("/", path, &pathsz, &cpath, &parent, &basename);
+    get_canon_parent_basename(this_core->current_proc->wd_path, path, &pathsz, &cpath, &parent, &basename);
 
     if(!parent || !basename) {
         /* root directory */
@@ -240,7 +239,7 @@ int fs_link(const char *oldpath, const char *newpath) {
     if(!old) return -ENOENT;
     if(FS_ISDIR(old->flags)) return -EPERM;
 
-    get_canon_parent_basename("/", newpath, &pathsz, &cpath, &parent, &basename);
+    get_canon_parent_basename(this_core->current_proc->wd_path, newpath, &pathsz, &cpath, &parent, &basename);
 
     if(!parent || !basename) {
         /* root directory */
@@ -294,7 +293,7 @@ int fs_symlink(const char *target, const char *path) {
     char *cpath, *basename, *parent;
     int ret = 0;
 
-    get_canon_parent_basename("/", path, &pathsz, &cpath, &parent, &basename);
+    get_canon_parent_basename(this_core->current_proc->wd_path, path, &pathsz, &cpath, &parent, &basename);
 
     if(!parent || !basename) {
         /* root directory */
@@ -783,6 +782,14 @@ static fs_node_t *kopen_recur(const char *file, unsigned flags, unsigned symlink
 
 /* like open(2), but returns an fs_node instead of a fd */
 fs_node_t *kopen(const char *path, unsigned flags) {
-    /* TODO: cwd that is not hardcoded to "/" maybe? */
-    return kopen_recur(path, flags, 0, "/");
+    return kopen_recur(path, flags, 0, this_core->current_proc->wd_path);
+}
+
+/**
+ * Increase the refcount of a node and return it.
+ */
+fs_node_t *fs_node_clone(fs_node_t *node) {
+    if(!node) return NULL;
+    if(node->refcount >= 0) node->refcount++;
+    return node;
 }

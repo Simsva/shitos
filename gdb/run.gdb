@@ -68,6 +68,15 @@ define debug_kernel
   continue
 end
 
+# debug /bin/init
+define debug_init
+  file sysroot/bin/init
+  arch_pm
+
+  break main
+  continue
+end
+
 # v86 debugging
 define p_v86_rm_stack
   p/x *(struct v86_rm_stack *)($arg0 - sizeof(struct v86_rm_stack))

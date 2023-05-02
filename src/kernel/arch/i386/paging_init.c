@@ -11,29 +11,33 @@
 #define PADDR(a) ((void *)(a) - (KERNEL_MAP))
 #define FCOUNT (*(uint32_t *)PADDR(&frame_count))
 #define FRAMES (*(uint32_t **)PADDR(&frames))
+#define MAP_PAGES_PT (*(page_t (*)[64][1024])PADDR(&map_pages_pt))
 #define SET_FRAME(a) \
-    FRAMES[(a) / UINT32_WIDTH] \
-        |= 1<<((a) % UINT32_WIDTH);
+    FRAMES[(a) / 32] \
+        |= 1<<((a) % 32);
 
 extern void *kmem_head;
-extern void *kernel_pd;
+extern page_directory_t kernel_pd;
+extern page_t kernel_pts[1024];
 extern int *_kernel_lowtext_start;
 extern uint32_t frame_count;
 extern uint32_t *frames;
+extern page_t map_pages_pt[0x400][64];
 
 /* early pre-paging setup */
 __attribute__((section(".low.text"))) void paging_init(void) {
     void **kmem_head_low, *ptbase, *srccur;
-    uint32_t *pd, *pdcur, *ptcur, *vga_pt;
+    uint32_t *pd, *pdcur, *ptcur;
 
     /* get physical address of kmem_head */
     kmem_head_low = (void **)PADDR(&kmem_head);
     /* get physical address of pd */
-    pd = (uint32_t *)PADDR(&kernel_pd);
+    pd = (uint32_t *)PADDR(&kernel_pts);
+    /* inialize kernel pd */
+    ((page_directory_t *)PADDR(&kernel_pd))->paddr = (uintptr_t)pd;
     pdcur = pd + (KERNEL_MAP>>22);
 
-    vga_pt = *kmem_head_low;
-    ptbase = *kmem_head_low + 0x1000;
+    ptbase = *kmem_head_low;
     srccur = (void *)0;
     ptcur = ptbase;
 
@@ -64,13 +68,10 @@ __attribute__((section(".low.text"))) void paging_init(void) {
         }
     }
 
-    /* map VGA text mode memory to 0xffbff000 */
-    vga_pt[0x3ff] = 0xb8000 | 0x1;
-    pd[0x3fe] = (uint32_t)(vga_pt + 0x3ff) | 0x1;
-    SET_FRAME(0xb80000 >> 12);
-
-    /* map last PD entry to itself */
-    pd[0x3ff] = (uint32_t)pd | 0x1;
+    /* create page tables for the general mapping region */
+    for(uint16_t i = 0; i < 64; i++)
+        pd[((VMEM_MAP_PAGES_MEMORY >> 22) & 0x3ff) + i]
+            = (uint32_t)(MAP_PAGES_PT[i]) | 0x1;
 
     /* set frames to vaddr */
     FRAMES = (void *)FRAMES + KERNEL_MAP;

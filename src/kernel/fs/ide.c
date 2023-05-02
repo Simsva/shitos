@@ -304,11 +304,12 @@ static void ata_device_init(ata_device_t *dev) {
     }
 
     dev->is_atapi = 0;
-    /* TODO: alloc pages outside the heap maybe? */
-    dev->dma_prdt = kmalloc_a(PAGE_SIZE); /* we only ever use one entry */
-    dev->dma_prdt_phys = (uintptr_t)vmem_get_paddr(dev->dma_prdt);
-    dev->dma_start = kmalloc_a(PAGE_SIZE);
-    dev->dma_start_phys = (uintptr_t)vmem_get_paddr(dev->dma_start);
+    dev->dma_prdt_phys = vmem_frame_find_first() << PAGE_BITS;
+    vmem_frame_set(dev->dma_prdt_phys);
+    dev->dma_prdt = vmem_map_vaddr(dev->dma_prdt_phys);
+    dev->dma_start_phys = vmem_frame_find_first() << PAGE_BITS;
+    vmem_frame_set(dev->dma_start_phys);
+    dev->dma_start = vmem_map_vaddr(dev->dma_start_phys);
 
     dev->dma_prdt[0].offset = dev->dma_start_phys;
     dev->dma_prdt[0].bytes = ATA_BLOCK_SZ;
@@ -324,9 +325,10 @@ static void ata_device_init(ata_device_t *dev) {
 }
 
 /* only called on unused devices */
-static void ata_device_destroy(ata_device_t *dev) {
-    kfree(dev->dma_prdt);
-    kfree(dev->dma_start);
+static void ata_device_destroy(__unused ata_device_t *dev) {
+    /* TODO: unmap the now unused pages */
+    /* kfree(dev->dma_prdt); */
+    /* kfree(dev->dma_start); */
 }
 
 /* TODO: caching */

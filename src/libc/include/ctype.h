@@ -6,8 +6,23 @@
 
 _BEGIN_C_HEADER
 
-/* TODO: implement as function */
-#define isdigit(c) (((unsigned)(c)-'0') < 10)
+int isalnum(int);
+int isalpha(int);
+int isblank(int);
+int iscntrl(int);
+int isdigit(int);
+int isgraph(int);
+int islower(int);
+int isprint(int);
+int ispunct(int);
+int isspace(int);
+int isupper(int);
+int isxdigit(int);
+int isascii(int);
+
+int tolower(int);
+int toupper(int);
+int toascii(int);
 
 _END_C_HEADER
 

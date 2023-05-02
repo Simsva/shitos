@@ -30,7 +30,8 @@ global _isr1c
 global _isr1d
 global _isr1e
 global _isr1f
-global _isr80
+
+global _isr30
 
 _isr00:
     cli
@@ -185,6 +186,11 @@ _isr1f:
     cli
     push byte 0
     push byte 0x1f
+    jmp isr_common_stub
+_isr30:
+    cli
+    push byte 0
+    push byte 0x30
     jmp isr_common_stub
 
 extern _fault_handler

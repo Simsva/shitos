@@ -20,7 +20,7 @@ EXTPART=partitions/extpart.img
 EXTPARTSZ=128k
 
 
-all: dirs mbr stage1 stage2 kernel $(BOOTPART) $(EXTPART)
+all: dirs mbr stage1 stage2 kernel apps $(BOOTPART) $(EXTPART)
 
 
 clean:
@@ -30,6 +30,7 @@ clean:
 	@(cd $(ROOT)/src/boot/$(ARCH) && $(MAKE) clean)
 	@(cd $(ROOT)/src/kernel && $(MAKE) clean)
 	@(cd $(ROOT)/src/libc && $(MAKE) clean)
+	@(cd $(ROOT)/src/apps && $(MAKE) clean)
 
 
 clean_root:
@@ -48,6 +49,10 @@ $(DIRS):
 	@mkdir -p $@
 
 
+share:
+	@echo "Installing shared data"
+	@mkdir -p $(SYSROOT)/usr/share
+	@cp -r $(ROOT)/share/* $(SYSROOT)/usr/share
 headers:
 	@(cd $(ROOT)/src/boot/$(ARCH) && $(MAKE) install_headers)
 	@(cd $(ROOT)/src/kernel && $(MAKE) install_headers)
@@ -58,11 +63,12 @@ stage1: headers
 	@(cd $(ROOT)/src/boot/$(ARCH) && $(MAKE) stage1)
 stage2: headers libc
 	@(cd $(ROOT)/src/boot/$(ARCH) && $(MAKE) stage2)
-# FIXME: kernel depends on headers in stage2
 kernel: headers libc
 	@(cd $(ROOT)/src/kernel && $(MAKE) kernel install)
 libc: headers
 	@(cd $(ROOT)/src/libc && $(MAKE) all install)
+apps: headers libc
+	@(cd $(ROOT)/src/apps && $(MAKE) all)
 
 
 # only used in GDB
@@ -88,12 +94,12 @@ debug: dirs structs
 
 
 # partition and combine to disk image
-iso: dirs $(ISO)
-$(ISO): mbr $(BOOTPART) $(EXTPART)
+iso: dirs share $(ISO)
+$(ISO): mbr apps $(BOOTPART) $(EXTPART)
 	@echo "ISO	partition.sh"
 	@rm $(ISO) 2>/dev/null || echo jank >/dev/null
 	@./partition.sh -vfm "$(MBR)" "$(ISO)" \
 		"$(BOOTPART):13::y" "$(EXTPART):linux::y"
 
 
-.PHONY: all clean dirs debug structs mbr stage1 stage2 kernel libc iso
+.PHONY: all clean dirs debug structs share headers mbr stage1 stage2 kernel libc apps iso

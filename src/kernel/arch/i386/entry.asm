@@ -3,7 +3,9 @@ bits 32
     %define KERNEL_MAP 0xc0000000
     %define PD_IND(x) ((x) >> 22)
     %define PT_START (entry_pt - KERNEL_MAP)
-    %define PD_START (kernel_pd - KERNEL_MAP)
+    %define PD_START (kernel_pts - KERNEL_MAP)
+
+extern kernel_pts
 
 extern gdt_install
 extern idt_install
@@ -26,9 +28,8 @@ extern kmem_head
 section .low.data
 
 _kernel_args:
-    dw 0                        ; tm_cursor
-    db 0                        ; boot_options
-    db 0                        ; drive_num
+    ;; XXX: this is manually changed to reflect the size of kernel args
+times 20 db 0
 
 section .low.text
 
@@ -90,6 +91,13 @@ _highstart:
 
     call vmem_init
 
+    ;; initialize the FPU
+    mov eax, cr0
+    or eax, 1<<1 | 1<<4
+    and eax, ~(1<<2 | 1<<3)
+    mov cr0, eax
+    fninit
+
     sti
 
     ;; call kmain
@@ -98,11 +106,6 @@ _highstart:
     jmp kmain
 
 section .bss
-
-global kernel_pd
-
-align 0x1000
-kernel_pd:  resb 0x1000
 
 stack_bottom:
     resb 0x4000                 ; 16 KiB

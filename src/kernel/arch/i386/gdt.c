@@ -1,9 +1,13 @@
 #include <kernel/arch/i386/gdt.h>
 
-extern void _gdt_flush();
+extern void _gdt_flush(void);
+extern void _tss_flush(void);
+
+static void write_tss(int i);
 
 struct gdt_entry _gdt[GDT_SIZE];
 struct gdt_ptr _gdtp;
+struct tss_entry _tss = { 0 };
 
 void _gdt_set_gate(int i, uint32_t base, uint32_t limit,
                    uint8_t access, uint8_t flags) {
@@ -50,13 +54,25 @@ void gdt_install(void) {
     _gdt_set_gate(1, 0, UINT32_MAX, 0x9a /* 1001 1010 */, 0xc0 /* 1100 0000 */);
     _gdt_set_gate(2, 0, UINT32_MAX, 0x92 /* 1001 0010 */, 0xc0 /* 1100 0000 */);
 
-    /* v86 real mode CS and DS */
-    _gdt_set_gate(3, 0, UINT16_MAX, 0x9a /* 1001 1010 */, 0x00 /* 0000 0000 */);
-    _gdt_set_gate(4, 0, UINT16_MAX, 0x92 /* 1001 0010 */, 0x00 /* 0000 0000 */);
-
     /* ring 3 CS and DS */
-    _gdt_set_gate(5, 0, UINT32_MAX, 0xfa /* 1111 1010 */, 0xc0 /* 1100 0000 */);
-    _gdt_set_gate(6, 0, UINT32_MAX, 0xf2 /* 1111 0010 */, 0xc0 /* 1100 0000 */);
+    _gdt_set_gate(3, 0, UINT32_MAX, 0xfa /* 1111 1010 */, 0xc0 /* 1100 0000 */);
+    _gdt_set_gate(4, 0, UINT32_MAX, 0xf2 /* 1111 0010 */, 0xc0 /* 1100 0000 */);
+
+    /* task state segment */
+    write_tss(5);
 
     _gdt_flush();
+    _tss_flush();
+}
+
+static void write_tss(int i) {
+    uint32_t base = (uint32_t)&_tss;
+    uint32_t limit = base + sizeof _tss;
+
+    _gdt_set_gate(i, base, limit, 0xe9 /* 1110 1001 */, 0x00);
+
+    /* or with 3 for ring 3 */
+    _tss.cs = 0x08 | 0x03;
+    _tss.ds = _tss.ss = _tss.es = _tss.fs = _tss.gs = 0x10 | 0x03;
+    _tss.ss0 = 0x10;
 }

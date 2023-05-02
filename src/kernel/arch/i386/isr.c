@@ -1,8 +1,10 @@
 #include <kernel/arch/i386/isr.h>
+#include <kernel/syscall.h>
 
 #include <stdint.h>
 #include <stdio.h>
 #include <ansi.h>
+#include <features.h>
 
 #include <kernel/arch/i386/idt.h>
 #include <kernel/arch/i386/fault_handlers.h>
@@ -40,7 +42,7 @@ extern void _isr1d(void);
 extern void _isr1e(void);
 extern void _isr1f(void);
 
-extern void _isr_v86(void);
+extern void _isr30(void);
 
 void isrs_install(void) {
     /* flag bit 7: present, 6-5: ring, 4: zero, 3-0: type */
@@ -78,8 +80,8 @@ void isrs_install(void) {
     _idt_set_gate(0x1e, (uint32_t)_isr1e, 0x08, 0x8e);
     _idt_set_gate(0x1f, (uint32_t)_isr1f, 0x08, 0x8e);
 
-    /* virtual 8086 interrupt */
-    /* _idt_set_gate(INT_V86, (uint32_t)_isr_v86, 0x08, 0x8e); */
+    /* syscall */
+    _idt_set_gate(0x30, (uint32_t)_isr30, 0x08, 0xee);
 }
 
 const char *exception_msgs[] = {
@@ -122,15 +124,19 @@ void _fault_handler(struct int_regs r) {
     case FAULT_PAGE:
         _page_fault(&r);
         goto ret;
+
+    case ISR_SYSCALL:
+        _syscall_handler(&r);
+        goto ret;
     }
 
     if(r.int_no >= FAULT_COUNT) return;
 
     printf(ANSI_BG_RED ANSI_FG_BRIGHT_WHITE "int %#x: %s\n",
         r.int_no, exception_msgs[r.int_no]);
-    for(;;);
+    for(;;) asm volatile("hlt");
 
 ret:
-    __asm__ volatile(""); /* prevent optimizations that clobber stack */
+    asm volatile(""); /* prevent optimizations that clobber stack */
     return;
 }

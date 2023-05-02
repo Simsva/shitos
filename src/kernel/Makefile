@@ -2,7 +2,7 @@ ROOT=../../
 include $(ROOT)/include/mk/def_flags.mk
 include $(ROOT)/include/mk/programs.mk
 CFLAGS+=-ffreestanding
-CPPFLAGS+=-Iinclude -D_ARCH=$(ARCH)
+CPPFLAGS+=-Iinclude -D_ARCH=$(ARCH) -D_KERNEL
 
 LDFLAGS+=-nostdlib -lk -lgcc
 

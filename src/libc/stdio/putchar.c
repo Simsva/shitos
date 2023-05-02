@@ -1,5 +1,5 @@
-#include <stdio.h>
+#include "stdio_impl.h"
 
 int putchar(int ic) {
-    return putc(ic, stdout);
+    return fputc(ic, stdout);
 }

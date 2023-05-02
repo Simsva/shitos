@@ -22,6 +22,8 @@
 #define FAULT_MACHINE_CHECK     0x12
 #define FAULT_COUNT             0x20
 
+#define ISR_SYSCALL             0x30
+
 void isrs_install(void);
 
 #endif // I386_ISR_H_

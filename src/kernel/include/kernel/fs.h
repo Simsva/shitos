@@ -34,6 +34,8 @@
 #define PATH_CURRENT       "."
 #define PATH_GO_UP         ".."
 
+#define TREE_TO_FS_NODE(tree_node) (((struct vfs_entry *)((tree_node)->value))->file)
+
 struct fs_node;
 
 typedef ssize_t (*read_type_t)(struct fs_node *, off_t, size_t, uint8_t *);
@@ -97,7 +99,6 @@ struct vfs_entry {
 typedef fs_node_t *(*vfs_mount_t)(const char *, const char *);
 
 extern tree_t *fs_tree;
-extern fs_node_t *console_dev; /* TODO: move this */
 
 ssize_t fs_read(fs_node_t *node, off_t off, size_t sz, uint8_t *buf);
 ssize_t fs_write(fs_node_t *node, off_t off, size_t sz, uint8_t *buf);
@@ -127,5 +128,6 @@ void vfs_map_directory(const char *path);
 
 char *canonicalize_path(const char *cwd, const char *path, size_t *length);
 fs_node_t *kopen(const char *path, unsigned flags);
+fs_node_t *fs_node_clone(fs_node_t *node);
 
 #endif // KERNEL_FS_H_

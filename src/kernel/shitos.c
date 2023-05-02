@@ -1,14 +1,14 @@
-#include <kernel/tty/tm.h>
+#include <kernel/tty.h>
 #include <kernel/fs.h>
+#include <kernel/console.h>
+#include <kernel/video.h>
 #include <kernel/args.h>
+#include <kernel/process.h>
 #include <ext2fs/ext2.h>
 #include <stdio.h>
 #include <string.h>
 
-#include <kernel/arch/i386/ports.h>
-
-#include <kernel/kmem.h>
-#include <sys/stat.h>
+#include <kernel/arch/i386/arch.h>
 
 #define STR(s) #s
 #define EXPAND_STR(s) STR(s)
@@ -20,42 +20,54 @@ void ps2hid_install(void);
 void ide_init(void);
 void dospart_init(void);
 void bootpart_init(void);
+void pit_init(void);
 
-static void tree_print_fs(tree_item_t item) {
-    struct vfs_entry *entry = item;
-    printf("%s", entry->name);
-    if(entry->fs_type)
-        printf("[%s]", entry->fs_type);
-    if(entry->file)
-        printf(" -> %s : %u", entry->file->name, entry->file->inode);
-    putchar('\n');
+void user_test(void) {
+    asm volatile("mov $0x45, %ax");
 }
 
 void kmain(struct kernel_args *args) {
-    tm_cur_x = args->tm_cursor % 80;
-    tm_cur_y = args->tm_cursor / 80;
     memcpy(&kernel_args, args, sizeof kernel_args);
 
+    pit_init();
     vfs_install();
+    process_init();
     vfs_map_directory("/dev");
     console_install();
-    zero_install();
-    random_install();
-    ps2hid_install();
     ide_init();
     dospart_init();
     bootpart_init();
     ext2fs_init();
+    zero_install();
+    random_install();
+    ps2hid_install();
 
     /* TODO: automatically detect devices somehow */
     vfs_mount_type("dospart", "/dev/ada", NULL);
     vfs_mount_type("ext2fs", "/dev/ada2,rw,verbose", "/");
     vfs_mount_type("bootpart", "/dev/ada1,verbose", "/boot");
 
-    puts("Booting ShitOS (" EXPAND_STR(_ARCH) ")");
+    fb_init();
+    if(kernel_args.video_mode == VIDEO_TEXT)
+        tm_term_install();
+    else
+        fb_term_install("/usr/share/consolefonts/default8x16.psfu");
 
-    printf("fs_tree:\n");
-    tree_debug_dump(fs_tree, tree_print_fs);
+    puts("Welcome to ShitOS (" EXPAND_STR(_ARCH) ")");
+
+    int i, j, n;
+    for(i = 0; i < 11; i++) {
+        for(j = 0; j < 10; j++) {
+            n = 10 * i + j;
+            if(n > 108) break;
+            printf("\033[%dm %3d\033[m", n, n);
+        }
+        printf("\n");
+    }
+
+    /* call init */
+    const char *init_argv[] = { "/bin/init", };
+    binfmt_system(init_argv[0], 1, (char *const *)init_argv, NULL);
 
     for(;;) asm volatile("hlt");
 }

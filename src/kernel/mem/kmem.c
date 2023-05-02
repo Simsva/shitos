@@ -19,12 +19,25 @@ void *kmalloc_i(size_t sz, int align) {
     return tmp;
 }
 
+/**
+ * Allocate memory on the kernel heap.
+ */
 void *kmalloc(size_t sz) {
     return kmalloc_i(sz, 0);
 }
 
+/**
+ * Allocate page aligned memory on the kernel heap.
+ */
 void *kmalloc_a(size_t sz) {
-    return kmalloc_i(sz, 1);
+    return kmalloc_i(sz, PAGE_BITS);
+}
+
+/**
+ * Resize an allocation, respects alignment.
+ */
+void *krealloc(void *ptr, size_t sz) {
+    return vmem_heap_realloc(&kheap, ptr, sz);
 }
 
 /* should never be called on memory allocated pre-heap */

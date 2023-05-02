@@ -1,14 +1,10 @@
 #include <kernel/vmem.h>
-
 #include <kernel/kmem.h>
 #include <assert.h>
 #include <stdint.h>
 #include <stdbool.h>
 #include <stdio.h>
-
-#if _ARCH == i386
-# include <kernel/arch/i386/paging.h>
-#endif
+#include <string.h>
 
 static void vmem_heap_expand(vmem_heap_t *heap, size_t new_sz);
 static int vmem_header_compar(ord_arr_type_t a, ord_arr_type_t b);
@@ -17,68 +13,21 @@ static size_t vmem_heap_hole_find(vmem_heap_t *heap, size_t sz, uint8_t align);
 
 vmem_heap_t kheap = {0};
 
-void *vmem_get_paddr(void *vaddr) {
-#if _ARCH == i386
-    return i386_get_paddr(vaddr);
-#else
-    puts("vmem_get_paddr not implemented for the current architecture");
-    return NULL;
-#endif
-}
-
-void vmem_map(void *paddr, void *vaddr, uint8_t flags) {
-#if _ARCH == i386
-    i386_map_page(paddr, vaddr, flags);
-#else
-    puts("vmem_map not implemented for the current architecture");
-#endif
-}
-
-void vmem_unmap(void *vaddr) {
-#if _ARCH == i386
-    i386_unmap_page(vaddr);
-#else
-    puts("vmem_unmap not implemented for the current architecture");
-#endif
-}
-
-void vmem_init(void) {
-    /* create heap, assume kmem_head is aligned */
-    vmem_heap_create(&kheap, kmem_head, kmem_head+VMEM_HEAP_INITIAL_SZ,
-                     (void *)0xcffff000);
-
-#if _ARCH == i386
-    /* create initial buffer PT */
-    /* buffer_pt = kmalloc_a(0x1000); */
-#else
-    puts("vmem_init not implemented for the current architecture");
-#endif
-}
-
-void vmem_alloc(void *vaddr, uint8_t flags) {
-#if _ARCH == i386
-    /* TODO: check if vaddr is mapped already */
-    uint32_t frame = frame_find_first();
-    assert(frame != UINT32_MAX);
-    i386_map_page((void *)(frame * PAGE_SIZE), vaddr, flags);
-#else
-    puts("vmem_page_alloc not implemented for the current architecture");
-#endif
-}
-
 /* heap */
 static int vmem_header_compar(ord_arr_type_t a, ord_arr_type_t b) {
     return ((vmem_header_t *)a)->size < ((vmem_header_t *)b)->size;
 }
 
-void vmem_heap_create(vmem_heap_t *heap, void *start, void *end, void *max) {
+void vmem_heap_create(vmem_heap_t *heap, void *start, void *end, void *max, size_t index_sz, uint8_t kernel) {
     /* vmem_heap_t *heap = (vmem_heap_t *)kmalloc(sizeof(vmem_heap_t)); */
 
-    assert((uint32_t)start % PAGE_SIZE == 0);
-    assert((uint32_t)end % PAGE_SIZE == 0);
+    assert((uintptr_t)start % PAGE_SIZE == 0);
+    assert((uintptr_t)end % PAGE_SIZE == 0);
 
-    ord_arr_place(&heap->index, start, VMEM_HEAP_INDEX_SZ, &vmem_header_compar);
-    start += sizeof(ord_arr_type_t) * VMEM_HEAP_INDEX_SZ;
+    heap->kernel = kernel;
+
+    ord_arr_place(&heap->index, start, index_sz, &vmem_header_compar);
+    start += sizeof(ord_arr_type_t) * index_sz;
 
     /* align start */
     start = (void *)((uintptr_t)(start + PAGE_SIZE-1) & ~(PAGE_SIZE-1));
@@ -91,6 +40,7 @@ void vmem_heap_create(vmem_heap_t *heap, void *start, void *end, void *max) {
     vmem_header_t *hole = (vmem_header_t *)start;
     hole->size = end - start;
     hole->magic = VMEM_HEAP_MAGIC;
+    hole->align = 0;
     hole->hole = 1;
 
     vmem_footer_t *ftr = end - sizeof(vmem_footer_t);
@@ -106,11 +56,12 @@ static void vmem_heap_expand(vmem_heap_t *heap, size_t new_sz) {
     assert(new_sz > (size_t)(heap->end - heap->start));
     assert(heap->start + new_sz <= heap->max);
 
-    size_t old_sz = heap->end - heap->start;
-    while(old_sz < new_sz) {
-        vmem_alloc(heap->start+old_sz, 0x2);
-        old_sz += PAGE_SIZE;
-    }
+    unsigned get_flags = VMEM_GET_CREATE, alloc_flags = VMEM_FLAG_WRITE;
+    if(heap->kernel) get_flags |= VMEM_GET_KERNEL, alloc_flags |= VMEM_FLAG_KERNEL;
+
+    for(size_t old_sz = heap->end - heap->start; old_sz < new_sz; old_sz += PAGE_SIZE)
+        vmem_frame_alloc(vmem_get_page((uintptr_t)heap->start+old_sz,
+                                       get_flags), alloc_flags);
     heap->end = heap->start + new_sz;
 }
 
@@ -122,7 +73,8 @@ static size_t __unused vmem_heap_contract(vmem_heap_t *heap, size_t new_sz) {
 
     size_t old_sz = heap->end - heap->start;
     while(old_sz > new_sz) {
-        vmem_unmap((void *)old_sz);
+        vmem_frame_free(vmem_get_page((uintptr_t)heap->start+old_sz,
+                                      VMEM_GET_CREATE|VMEM_GET_KERNEL));
         old_sz -= PAGE_SIZE;
     }
     heap->end = heap->start + new_sz;
@@ -144,9 +96,9 @@ static size_t vmem_heap_hole_find(vmem_heap_t *heap, size_t size, uint8_t align)
             /* align location AFTER the header */
             loc = (uintptr_t)header + sizeof(vmem_header_t);
             off = 0;
-            if(loc & (PAGE_SIZE-1))
-                off = PAGE_SIZE - (loc & (PAGE_SIZE-1));
-            if(off < sizeof(vmem_header_t)) off += PAGE_SIZE;
+            if(loc & ((1<<align)-1))
+                off = (1<<align) - (loc & ((1<<align)-1));
+            if(off < sizeof(vmem_header_t)) off += 1<<align;
             if(off > hole_sz) continue;
             hole_sz -= off;
         }
@@ -186,6 +138,7 @@ void *vmem_heap_alloc(vmem_heap_t *heap, size_t size, uint8_t align) {
             hdr->magic = VMEM_HEAP_MAGIC;
             hdr->size = heap_newsz - heap_oldsz;
             hdr->hole = 1;
+            hdr->align = 0;
 
             vmem_footer_t *ftr = (vmem_footer_t *)((void *)hdr + hdr->size - sizeof(vmem_footer_t));
             ftr->magic = VMEM_HEAP_MAGIC;
@@ -213,16 +166,17 @@ void *vmem_heap_alloc(vmem_heap_t *heap, size_t size, uint8_t align) {
 
     /* align and create a hole before */
     if(align) {
-        uintptr_t off = PAGE_SIZE - ((uintptr_t)orig_header & 0xfff);
+        uintptr_t off = (1<<align) - ((uintptr_t)orig_header & ((1<<align)-1));
         /* make sure the header fits */
         if(off < sizeof(vmem_header_t))
-            off += PAGE_SIZE;
+            off += 1<<align;
 
         void *new_loc = (void *)orig_header + off - sizeof(vmem_header_t);
 
         orig_header->size = off - sizeof(vmem_header_t);
         orig_header->magic = VMEM_HEAP_MAGIC;
         orig_header->hole = 1;
+        orig_header->align = 0;
 
         vmem_footer_t *footer = new_loc - sizeof(vmem_footer_t);
         footer->magic = VMEM_HEAP_MAGIC;
@@ -237,6 +191,7 @@ void *vmem_heap_alloc(vmem_heap_t *heap, size_t size, uint8_t align) {
     orig_header->size = real_size;
     orig_header->magic = VMEM_HEAP_MAGIC;
     orig_header->hole = 0;
+    orig_header->align = align;
     vmem_footer_t *footer = (void *)orig_header + real_size - sizeof(vmem_footer_t);
     footer->magic = VMEM_HEAP_MAGIC;
     footer->hdr = orig_header;
@@ -246,6 +201,7 @@ void *vmem_heap_alloc(vmem_heap_t *heap, size_t size, uint8_t align) {
         header->size = hole_size - real_size;
         header->magic = VMEM_HEAP_MAGIC;
         header->hole = 1;
+        header->align = 0;
 
         vmem_footer_t *footer = (void *)header + header->size - sizeof(vmem_footer_t);
         if((uintptr_t)footer < (uintptr_t)heap->end) {
@@ -259,6 +215,143 @@ void *vmem_heap_alloc(vmem_heap_t *heap, size_t size, uint8_t align) {
     return (void *)orig_header + sizeof(vmem_header_t);
 }
 
+void *vmem_heap_realloc(vmem_heap_t *heap, void *old, size_t size) {
+    if(!old) return vmem_heap_alloc(heap, size, 0);
+    if(!size) { vmem_heap_free(heap, old); return NULL; }
+
+    /* this is more useful in calculations */
+    size += sizeof(vmem_header_t) + sizeof(vmem_footer_t);
+
+    vmem_header_t *hdr = old - sizeof(vmem_header_t);
+    vmem_header_t *ftr = (void *)hdr + hdr->size - sizeof(vmem_footer_t);
+    vmem_header_t *rhdr = (void *)ftr + sizeof(vmem_footer_t);
+
+    assert(hdr->magic == VMEM_HEAP_MAGIC);
+    assert(ftr->magic == VMEM_HEAP_MAGIC);
+    assert(hdr->hole == 0 && "realloc on freed segment");
+
+    if(hdr->size == size) return old;
+
+    /* shrink, new < old */
+    if(hdr->size > size) {
+        if((void *)rhdr + sizeof(vmem_header_t) <= heap->end && rhdr->hole) {
+            /* extend right hole */
+            size_t i = ord_arr_index(&heap->index, rhdr);
+            assert(i != SIZE_MAX && "Hole not in index");
+            ord_arr_remove(&heap->index, i);
+
+            vmem_header_t *new_rhdr = (void *)hdr + size;
+            new_rhdr->magic = VMEM_HEAP_MAGIC;
+            new_rhdr->align = 0;
+            new_rhdr->size = rhdr->size + (size - hdr->size);
+            new_rhdr->hole = 1;
+
+            vmem_footer_t *old_rftr = (void *)rhdr + rhdr->size - sizeof(vmem_footer_t);
+            old_rftr->hdr = new_rhdr;
+
+            ord_arr_insert(&heap->index, new_rhdr);
+        } else if(size - hdr->size >= sizeof(vmem_header_t) + sizeof(vmem_footer_t)) {
+            /* shrink if a new hole will fit */
+            vmem_header_t *hole = (void *)hdr + size;
+            hole->magic = VMEM_HEAP_MAGIC;
+            hole->hole = 1;
+            hole->size = size - hdr->size;
+            hole->align = 0;
+
+            vmem_footer_t *hole_ftr = (void *)hole + hole->size - sizeof(vmem_footer_t);
+            hole_ftr->magic = VMEM_HEAP_MAGIC;
+            hole_ftr->hdr = hole;
+
+            ord_arr_insert(&heap->index, hole);
+        } else {
+            /* if a new hole won't fit, keep the old size */
+            return old;
+        }
+
+        /* add new footer */
+        hdr->size = size;
+        vmem_footer_t *new_ftr = (void *)hdr + hdr->size - sizeof(vmem_footer_t);
+        new_ftr->magic = VMEM_HEAP_MAGIC;
+        new_ftr->hdr = hdr;
+        return old;
+    }
+
+    /* extend, new > old */
+    if((void *)rhdr + sizeof(vmem_header_t) > heap->end) {
+        /* expand heap */
+        size_t heap_oldsz = heap->end - heap->start;
+        vmem_heap_expand(heap, heap_oldsz + size);
+
+        hdr->size = size;
+        vmem_footer_t *new_ftr = (void *)hdr + hdr->size - sizeof(vmem_footer_t);
+        new_ftr->magic = VMEM_HEAP_MAGIC;
+        new_ftr->hdr = hdr;
+
+        /* after expansion we are guaranteed to fit a new hole */
+        vmem_header_t *hole = (void *)new_ftr + sizeof(vmem_footer_t);
+        hole->magic = VMEM_HEAP_MAGIC;
+        hole->hole = 1;
+        hole->size = (uintptr_t)heap->end - (uintptr_t)hole;
+        hole->align = 0;
+
+        vmem_footer_t *hole_ftr = (void *)hole + hole->size - sizeof(vmem_footer_t);
+        hole_ftr->magic = VMEM_HEAP_MAGIC;
+        hole_ftr->hdr = hole;
+
+        ord_arr_insert(&heap->index, hole);
+
+        return old;
+    }
+
+    if(rhdr->hole) {
+        /* merge with right hole */
+        vmem_footer_t *rftr = (void *)rhdr + rhdr->size - sizeof(vmem_footer_t);
+
+        size_t extra_size = size - hdr->size;
+        size_t i = ord_arr_index(&heap->index, rhdr);
+        ord_arr_remove(&heap->index, i);
+        if(rhdr->size < extra_size) {
+            /* if new allocation is larger than the hole then
+             * claim the hole and recurse */
+            hdr->size += rhdr->size;
+            rftr->hdr = hdr;
+
+            return vmem_heap_realloc(heap, old, size);
+        } else if(rhdr->size - extra_size >= sizeof(vmem_header_t) + sizeof(vmem_footer_t)) {
+            /* a new hole fits */
+            hdr->size = size;
+            vmem_footer_t *new_ftr = (void *)hdr + hdr->size - sizeof(vmem_footer_t);
+            new_ftr->magic = VMEM_HEAP_MAGIC;
+            new_ftr->hdr = hdr;
+
+            vmem_header_t *hole = (void *)new_ftr + sizeof(vmem_footer_t);
+            hole->magic = VMEM_HEAP_MAGIC;
+            hole->hole = 1;
+            hole->size = (uintptr_t)rftr + sizeof(vmem_footer_t) - (uintptr_t)hole;
+            hole->align = 0;
+
+            rftr->hdr = hole;
+
+            ord_arr_insert(&heap->index, hole);
+            return old;
+        } else {
+            /* no new hole fits, so claim the entire hole */
+            hdr->size += rhdr->size;
+            rftr->hdr = hdr;
+            return old;
+        }
+    }
+
+    /* no way to extend our allocation means we need a new one */
+    void *new_alloc = vmem_heap_alloc(heap, size - sizeof(vmem_header_t)
+                                                 - sizeof(vmem_footer_t),
+                                      hdr->align);
+    memcpy(new_alloc, old, hdr->size - sizeof(vmem_header_t)
+                                     - sizeof(vmem_footer_t));
+    vmem_heap_free(heap, old);
+    return new_alloc;
+}
+
 void vmem_heap_free(vmem_heap_t *heap, void *p) {
     if(p == NULL) return;
 
@@ -270,6 +363,7 @@ void vmem_heap_free(vmem_heap_t *heap, void *p) {
     assert(hdr->hole == 0 && "Double free");
 
     hdr->hole = 1;
+    hdr->align = 0;
     bool add_hole = true;
 
     /* unify left */
@@ -308,6 +402,8 @@ void vmem_heap_dump(vmem_heap_t *heap) {
 
     while((void *)hdr < heap->end) {
         if(hdr->magic != VMEM_HEAP_MAGIC) goto magic_err;
+        vmem_footer_t *ftr = (void *)hdr + hdr->size - sizeof(vmem_footer_t);
+        if(ftr->magic != VMEM_HEAP_MAGIC) goto magic_err;
         printf("%p\talloc:%d sz:%#zx\trsz:%#zx\n",
                hdr, !hdr->hole,
                hdr->size - sizeof(vmem_header_t) - sizeof(vmem_footer_t),

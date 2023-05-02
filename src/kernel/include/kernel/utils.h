@@ -1,7 +1,6 @@
 #ifndef KERNEL_UTILS_H_
 #define KERNEL_UTILS_H_
 
-
 #ifndef asm
 # define asm __asm__
 #endif

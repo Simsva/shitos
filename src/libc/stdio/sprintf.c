@@ -1,4 +1,4 @@
-#include <stdio.h>
+#include "stdio_impl.h"
 
 int sprintf(char *restrict buf, const char *restrict fmt, ...) {
     int ret;
