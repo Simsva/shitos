@@ -20,6 +20,7 @@ void ps2hid_install(void);
 void ide_init(void);
 void dospart_init(void);
 void bootpart_init(void);
+void pit_init(void);
 
 void user_test(void) {
     asm volatile("mov $0x45, %ax");
@@ -28,6 +29,7 @@ void user_test(void) {
 void kmain(struct kernel_args *args) {
     memcpy(&kernel_args, args, sizeof kernel_args);
 
+    pit_init();
     vfs_install();
     process_init();
     vfs_map_directory("/dev");
