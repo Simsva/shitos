@@ -173,6 +173,12 @@ long sys_sysfunc(long request, void *args) {
             vmem_heap_dump((vmem_heap_t *)&this_core->current_proc->heap);
         return 0;
 
+    case 4: /* millis */
+        PTR_VALIDATE(args);
+        extern uintmax_t pit_ticks;
+        *((uintmax_t *)args) = pit_ticks;
+        return 0;
+
     default:
         printf("Bad sysfunc: %ld\n", request);
         return -EINVAL;

@@ -15,10 +15,20 @@ int main(__unused int argc, __unused char *argv[]) {
     syscall_open("/dev/console", O_WRONLY, 0); /* fd 1: stdout */
     syscall_open("/dev/console", O_WRONLY, 0); /* fd 2: stderr */
 
-    FILE *fbfile = fopen("/dev/fb0", "r");
-    syscall_ioctl(fbfile->fd, IOCTL_VID_MAP, &fb);
-    memset(fb, 0xff, 1280*4*10);
+    uintmax_t start, now;
+    syscall_sysfunc(4, &start);
+    for(;;) {
+        syscall_sysfunc(4, &now);
+        if(now - start > 1000) {
+            printf("1 second\n");
+            start = now;
+        }
+    }
 
-    fclose(fbfile);
+    /* FILE *fbfile = fopen("/dev/fb0", "r"); */
+    /* syscall_ioctl(fbfile->fd, IOCTL_VID_MAP, &fb); */
+    /* memset(fb, 0xff, 1280*4*10); */
+
+    /* fclose(fbfile); */
     return EXIT_SUCCESS;
 }
