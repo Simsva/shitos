@@ -3,6 +3,10 @@
 
 #include <stdio.h>
 
+#define F_EOF   0x01
+#define F_ERR   0x02
+#define F_BLOCK 0x04
+
 extern __hidden FILE *__head;
 
 extern __hidden FILE __stdin_FILE;

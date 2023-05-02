@@ -45,7 +45,7 @@ typedef struct __FILE {
     int fd;
 
     off_t off;
-    int eof, error;
+    unsigned flags;
     int ungetc;
 
     struct __FILE *prev, *next;

@@ -13,8 +13,9 @@ size_t __stdio_read(FILE *f, unsigned char *buf, size_t sz) {
         }
 
         r = syscall_read(f->fd, (char *)buf, sz);
-        if(r == 0) f->eof = 1;
-        break;
+        if(r <= 0) f->flags |= F_EOF;
+        else sz -= r;
+        if(!(f->flags & F_BLOCK)) break;
     }
     return r;
 }

@@ -1,5 +1,5 @@
 #include "stdio_impl.h"
 
 void clearerr(FILE *f) {
-    f->eof = f->error = 0;
+    f->flags &= ~(F_EOF|F_ERR);
 }

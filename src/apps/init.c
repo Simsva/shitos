@@ -3,11 +3,9 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <syscall.h>
-#include <stdint.h>
 #include <string.h>
-#include <kernel/video.h>
 
-uint32_t *fb = (void *)0x70000000;
+#define MAX_STR 32
 
 int main(__unused int argc, __unused char *argv[]) {
     /* TODO: /dev/null and fix these later (tty) */
@@ -15,20 +13,22 @@ int main(__unused int argc, __unused char *argv[]) {
     syscall_open("/dev/console", O_WRONLY, 0); /* fd 1: stdout */
     syscall_open("/dev/console", O_WRONLY, 0); /* fd 2: stderr */
 
-    uintmax_t start, now;
-    syscall_sysfunc(4, &start);
+    /* emulate blocking I/O in libc */
+    stdin->flags |= 4;
+
+    /* TODO: ascii + display characters as they are typed */
+    /* this is all disgusting jank because we don't have proper ttys */
+    char buf[MAX_STR];
     for(;;) {
-        syscall_sysfunc(4, &now);
-        if(now - start > 1000) {
-            printf("1 second\n");
-            start = now;
-        }
+        printf("$ ");
+        fflush(stdout);
+        fgets(buf, sizeof buf, stdin);
+        printf("you entered: ");
+        size_t sz = strlen(buf);
+        for(size_t i = 0; i < sz; i++)
+            printf("%02X", (unsigned char)buf[i]);
+        putchar('\n');
     }
 
-    /* FILE *fbfile = fopen("/dev/fb0", "r"); */
-    /* syscall_ioctl(fbfile->fd, IOCTL_VID_MAP, &fb); */
-    /* memset(fb, 0xff, 1280*4*10); */
-
-    /* fclose(fbfile); */
     return EXIT_SUCCESS;
 }

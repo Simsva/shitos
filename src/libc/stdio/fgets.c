@@ -10,7 +10,7 @@ char *fgets(char *restrict s, int sz, FILE *restrict f) {
         if(--sz == 0 || c == '\n') return r;
     }
     if(c == EOF) {
-        f->eof = 1;
+        f->flags |= F_EOF;
         return r == s ? NULL : r;
     }
     return NULL;

@@ -1,5 +1,5 @@
 #include "stdio_impl.h"
 
 int ferror(FILE *f) {
-    return f->error;
+    return f->flags & F_ERR;
 }
