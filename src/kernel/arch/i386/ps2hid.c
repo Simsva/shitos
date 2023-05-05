@@ -30,7 +30,7 @@
 
 #define BIT(n) (1<<(n))
 
-uint8_t sc3[] = {
+uint8_t sc3_to_usb[] = {
     [0x08] = KEY_ESC,
     [0x16] = KEY_1,
     [0x1E] = KEY_2,
@@ -53,7 +53,7 @@ uint8_t sc3[] = {
     [0x2C] = KEY_T,
     [0x35] = KEY_Y,
     [0x3C] = KEY_U,
-    [0x48] = KEY_I,
+    [0x43] = KEY_I,
     [0x44] = KEY_O,
     [0x4D] = KEY_P,
     [0x54] = KEY_LEFTBRACE,
@@ -104,7 +104,7 @@ uint8_t sc3[] = {
     [0x6C] = KEY_KP7,
     [0x75] = KEY_KP8,
     [0x7D] = KEY_KP9,
-    [0x4E] = KEY_KPMINUS,
+    /* [0x4E] = KEY_KPMINUS, */
     [0x6B] = KEY_KP4,
     [0x73] = KEY_KP5,
     [0x74] = KEY_KP6,
@@ -123,8 +123,18 @@ uint8_t sc3[] = {
 };
 
 static uint8_t mod = 0;
-// 1 means not released
-static uint8_t released = 1;
+static uint8_t not_released = 1;
+static uint8_t send = 1;
+
+void change_mod(int modkey) {
+    if (not_released) {
+        mod = modkey; 
+    }
+    else {
+        mod = 0;
+    }
+    send = 0;
+}
 
 fs_node_t *kbd_pipe = NULL;
 
@@ -170,19 +180,35 @@ static inline uint8_t kbd_write(uint8_t byte) {
 static void kbd_handler(__unused struct int_regs *r) {
     /* Read from keyboard buffer */
     uint8_t scancode = inportb(PS2_DATA);
+    uint8_t keycode = sc3_to_usb[scancode];
+    
+    switch(keycode) {
+        case KEY_LEFTSHIFT:
+            change_mod(KEY_MOD_LSHIFT); 
+            break;
+        case KEY_LEFTCTRL:
+            change_mod(KEY_MOD_LCTRL);
+            break;
+    }
+
     if (scancode == 0xF0) {
         //printf("test");
-        released = 0;
+        not_released = 0;
     }
-    else {    
-        struct kb_packet key_press = {
-            .keycode = sc3[scancode],
-            .mod = mod,
-            .release_flag = released, 
-        };
+    else {
+        if (send) { 
+            struct kb_packet key_press = {
+                .keycode = keycode,
+                .mod = mod,
+                .release_flag = not_released, 
+            };
 
-        handle_kb_input(key_press);    
-        released = 1;
+            handle_kb_input(key_press);    
+        }
+        else {
+            send = 1;
+        }
+        not_released = 1;
     }
 
 }
