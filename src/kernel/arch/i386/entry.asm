@@ -88,7 +88,7 @@ _highstart:
     call idt_install
     call irq_install
     call isrs_install
-
+     
     call vmem_init
 
     ;; initialize the FPU
