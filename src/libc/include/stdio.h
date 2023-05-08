@@ -111,6 +111,10 @@ int vsscanf(const char *__restrict, const char *__restrict, va_list);
 int setvbuf(FILE *__restrict, char *__restrict, int, size_t);
 void setbuf(FILE *__restrict, char *__restrict);
 
+#ifndef __is_libk
+void perror(const char *);
+#endif
+
 _END_C_HEADER
 
 #endif // STDIO_H_

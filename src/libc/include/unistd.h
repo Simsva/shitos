@@ -3,6 +3,7 @@
 
 #include <_cheader.h>
 #include <sys/types.h>
+#include <stddef.h>
 
 _BEGIN_C_HEADER
 
@@ -10,6 +11,9 @@ _BEGIN_C_HEADER
 #define X_OK 1
 #define W_OK 2
 #define R_OK 4
+
+char *getcwd(char *, size_t);
+int chdir(const char *);
 
 /* FIXME: no */
 typedef int intptr_t;

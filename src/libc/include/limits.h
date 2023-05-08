@@ -40,4 +40,6 @@
 
 #define NL_ARGMAX  (9)
 
+#define PATH_MAX   4096
+
 #endif // LIMITS_H_

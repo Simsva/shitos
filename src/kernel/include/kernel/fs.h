@@ -33,6 +33,7 @@
 #define PATH_SEPARATOR_STR "/"
 #define PATH_CURRENT       "."
 #define PATH_GO_UP         ".."
+#define PATH_MAX           4096 /* nothing is actually enforcing this */
 
 #define TREE_TO_FS_NODE(tree_node) (((struct vfs_entry *)((tree_node)->value))->file)
 
