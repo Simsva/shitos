@@ -8,6 +8,7 @@ extern fs_node_t *kbd_pipe;
 
 static const char *us_keymap[][256] = {
     { /* bare */
+        [KEY_ENTER] = "\n",
         [KEY_0] = "0",
         [KEY_1] = "1",
         [KEY_2] = "2",
@@ -48,7 +49,7 @@ static const char *us_keymap[][256] = {
         [KEY_DOWN] = "\033[B",
         [KEY_RIGHT] = "\033[C",
         [KEY_LEFT] = "\033[D",
-        [KEY_LEFTSHIFT] = "",
+        [KEY_SPACE] = " ",
     },
     { /* ctrl */
        [KEY_0] = "\0",
