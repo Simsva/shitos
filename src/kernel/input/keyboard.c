@@ -50,6 +50,8 @@ static const char *us_keymap[][256] = {
         [KEY_RIGHT] = "\033[C",
         [KEY_LEFT] = "\033[D",
         [KEY_SPACE] = " ",
+        [KEY_DOT] = ".",
+        [KEY_SLASH] = "/"
     },
     { /* ctrl */
        [KEY_0] = "\0",
@@ -143,7 +145,7 @@ void handle_kb_input(struct kb_packet keypress) {
         const char *str = us_keymap[keypress.mod][keypress.keycode];
         if(str) {
             printf("%s", str);
-            fs_write(kbd_pipe, 0, strlen(str), str);
+            fs_write(kbd_pipe, 0, strlen(str), (uint8_t *)str);
         }
 
     }
