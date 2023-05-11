@@ -4,5 +4,6 @@
 #include <syscall.h>
 
 long __syscall_ret(long);
+void *__syscall_retp(long);
 
 #endif // __SYSCALL_H_

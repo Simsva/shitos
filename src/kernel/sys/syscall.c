@@ -5,9 +5,13 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <stdio.h>
+#include <string.h>
 #include <errno.h>
 
 #include <kernel/arch/i386/arch.h>
+
+#define MAX(a, b) ((a) > (b) ? (a) : (b))
+#define MIN(a, b) ((a) < (b) ? (a) : (b))
 
 typedef long (*syscall_fn)(long, long, long, long, long, long);
 
@@ -205,6 +209,52 @@ long sys_ioctl(int fd, long request, void *argp) {
     return fs_ioctl(FD_ENTRY(fd), request, argp);
 }
 
+long sys_getcwd(char *buf, size_t sz) {
+    PTR_CHECK(buf, sz, VMEM_PTR_FLAG_WRITE);
+    size_t len = strlen(this_core->current_proc->wd_path) + 1;
+    if(sz < len) return -ERANGE;
+    return (long)memcpy(buf, this_core->current_proc->wd_path, len);
+}
+
+long sys_chdir(const char *newpath) {
+    PTR_VALIDATE(newpath);
+    int ret = 0;
+    size_t len;
+    char *path = canonicalize_path(this_core->current_proc->wd_path, newpath, &len);
+
+    fs_node_t *node = kopen(path, 0);
+    if(!node) {
+        ret = -ENOENT;
+        goto ret_free;
+    }
+    if(!FS_ISDIR(node->flags)) {
+        fs_close(node);
+        ret = -ENOTDIR;
+        goto ret_free;
+    }
+    /* TODO: check permission */
+
+    kfree(this_core->current_proc->wd_path);
+    fs_close(this_core->current_proc->wd_node);
+    this_core->current_proc->wd_path = path;
+    this_core->current_proc->wd_node = node; /* is this actually used anywhere? */
+    return 0;
+ret_free:
+    kfree(path);
+    return ret;
+}
+
+long sys_readdir(int fd, long idx, struct dirent *ent) {
+    if(!FD_CHECK(fd)) return -EBADFD;
+    if(!ent) return -EFAULT;
+    PTR_VALIDATE(ent);
+    struct dirent *kent = fs_readdir(FD_ENTRY(fd), (off_t)idx);
+    if(!kent) return 0;
+    memcpy(ent, kent, sizeof *ent);
+    kfree(kent);
+    return 1;
+}
+
 /* this system should work unless we use
  * floating point arguments (which we don't) */
 #define SYSCALL(fn) ((syscall_fn)(uintptr_t)(fn))
@@ -219,6 +269,9 @@ static const syscall_fn syscalls[NUM_SYSCALLS] = {
     [SYS_mknod]     = SYSCALL(sys_mknod),
     [SYS_unlink]    = SYSCALL(sys_unlink),
     [SYS_ioctl]     = SYSCALL(sys_ioctl),
+    [SYS_getcwd]    = SYSCALL(sys_getcwd),
+    [SYS_chdir]     = SYSCALL(sys_chdir),
+    [SYS_readdir]   = SYSCALL(sys_readdir),
 };
 #undef SYSCALL
 

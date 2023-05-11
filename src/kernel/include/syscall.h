@@ -4,6 +4,7 @@
 #include <_cheader.h>
 #include <sys/types.h>
 #include <stddef.h>
+#include <dirent.h>
 
 _BEGIN_C_HEADER
 
@@ -98,6 +99,9 @@ DECL_SYSCALL2(sysfunc,    long, void *);
 DECL_SYSCALL2(mknod,      const char *, mode_t);
 DECL_SYSCALL1(unlink,     const char *);
 DECL_SYSCALL3(ioctl,      int, long, void *);
+DECL_SYSCALL2(getcwd,     char *, size_t);
+DECL_SYSCALL1(chdir,      const char *);
+DECL_SYSCALL3(readdir,    int, long, struct dirent *);
 
 _END_C_HEADER
 

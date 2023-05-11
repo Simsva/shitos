@@ -14,11 +14,12 @@ struct dirent {
 typedef struct DIR {
     int fd;
     int cur_entry;
+    struct dirent ent;
 } DIR;
 
-DIR *opendir(const char *dirname);
-int closedir(DIR *dirp);
-struct dirent *readdir(DIR *dirp);
+DIR *opendir(const char *);
+int closedir(DIR *);
+struct dirent *readdir(DIR *);
 
 _END_C_HEADER
 

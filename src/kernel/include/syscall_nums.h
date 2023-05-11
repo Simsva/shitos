@@ -11,7 +11,10 @@
 #define SYS_mknod        7
 #define SYS_unlink       8
 #define SYS_ioctl        9
+#define SYS_getcwd       10
+#define SYS_chdir        11
+#define SYS_readdir      12
 
-#define NUM_SYSCALLS     10
+#define NUM_SYSCALLS     13
 
 #endif // SYSCALL_NUMS_H_
