@@ -16,50 +16,51 @@
 #define MAX_PATH PATH_MAX /* 4096 */
 
 int strnsplit(char *restrict s, const char *restrict delim, char **v, int n) {
-  char *pch, *save;
-  int c = 0;
-  pch = strtok_r(s, delim, &save);
-  while (n-- && pch != NULL)
-    v[c++] = pch, pch = strtok_r(NULL, delim, &save);
-  return c;
+    char *pch, *save;
+    int c = 0;
+    pch = strtok_r(s, delim, &save);
+    while(n-- && pch != NULL)
+        v[c++] = pch, pch = strtok_r(NULL, delim, &save);
+    return c;
 }
 
-void pwd() {
-  char cwd[MAX_PATH];
-  if (getcwd(cwd, sizeof(cwd)) != NULL)
-    printf("%s", cwd);
-  else
-    perror("error");
+void pwd(char new_line) {
+    char cwd[MAX_PATH];
+    if(getcwd(cwd, sizeof(cwd)) != NULL) {
+        printf("%s", cwd);
+        putchar(new_line);
+    }
+    else
+        perror("error");
 }
 
 
 void ls(int argc, char **argv) {
+    char *path;
 
-  char *path;
+    path = argc > 1 ? strdup(argv[1]) : getcwd(NULL, 0);  
 
-  path = argc > 1 ? strdup(argv[1]) : getcwd(NULL, 0);  
-
-  DIR *d;
-  struct dirent *dir;
-  d = opendir(path);
-  free(path);
-  if (d) {
-    errno = 0;
-    while ((dir = readdir(d)) != NULL) {
-      printf("%s ", dir->d_name);
-    }
-    if(errno) perror("readdir");
-    closedir(d);
-  } else {
-    perror("opendir");
-  }
+    DIR *d;
+    struct dirent *dir;
+    d = opendir(path);
+    free(path);
+    if(d != NULL) {
+        errno = 0;
+        while((dir = readdir(d)) != NULL) {
+            printf("%s ", dir->d_name);
+        }
+        if(errno) perror("readdir");
+        else putchar('\n');
+        closedir(d);
+    } else
+        perror("opendir");
 }
 
 
 void cd(int argc, char **argv) {
-  const char *path = argc > 1 ? argv[1] : "/";
-  if (chdir(path) != 0)
-    perror("error");
+    const char *path = argc > 1 ? argv[1] : "/";
+    if (chdir(path) != 0)
+        perror("error");
 }
 
 int main(__unused int argc, __unused char *argv[]) {
@@ -78,9 +79,8 @@ int main(__unused int argc, __unused char *argv[]) {
     char buf[MAX_STR], *argv2[MAX_ARGV];
     int argc2;
 
-
     for(;;) {
-        pwd();
+        pwd('\0');
         printf(" $ ");
         fflush(stdout);
 
@@ -88,15 +88,15 @@ int main(__unused int argc, __unused char *argv[]) {
         buf[strcspn(buf, "\n")] = '\0';
         argc2 = strnsplit(buf, " ", argv2, LEN(argv2)); 
 
-        if (!strcmp(argv2[0], "pwd"))
-          pwd();
-        else if (!strcmp(argv2[0], "ls"))
-          ls(argc2, argv2);
-        else if (!strcmp(argv2[0], "cd")) {
-          cd(argc2, argv2);
-        }
+        if(!strcmp(argv2[0], "pwd"))
+            pwd('\n');
+        else if(!strcmp(argv2[0], "ls"))
+            ls(argc2, argv2);
+        else if(!strcmp(argv2[0], "cd"))
+            cd(argc2, argv2);
+        else
+            puts("No such command!");
 
-        putchar('\n');
     }
 
     return EXIT_SUCCESS;
