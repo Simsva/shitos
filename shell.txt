@@ -1,4 +1,0 @@
-NOTES:
- - strcmp
- - strtok_r
- - fs funktioner (fråga simon)

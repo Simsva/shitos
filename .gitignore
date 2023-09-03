@@ -9,7 +9,9 @@ sysroot/
 *.img
 *.elf
 
+# LSP files
 .ccls-cache/
+.ccls
 compile_commands.json
 
 # User config

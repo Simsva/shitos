@@ -127,7 +127,8 @@ while [ "$1" ]; do
 , $part_sect, $part_type, $part_boot"
   if [ "$part_file" ]; then
     out_part_files="$out_part_files
-$part_num:dd if=$part_file of=$out_file conv=notrunc bs=512 seek=%d count=$part_sect"
+$part_num:dd if=$part_file of=$out_file conv=notrunc bs=512 seek=%d \
+count=$part_sect"
   else
     out_part_files="$out_part_files
 $part_num:"

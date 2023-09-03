@@ -41,8 +41,6 @@ clean_root:
 include include/mk/compile.mk
 
 
-# NOTE: some targets depend on `dirs` but do not list it as a prerequisite,
-# so make sure to run `make dirs` once manually in case of issues
 dirs: $(DIRS)
 $(DIRS):
 	@echo "MKDIR	$@"
@@ -97,7 +95,7 @@ debug: dirs structs
 iso: dirs share $(ISO)
 $(ISO): mbr apps $(BOOTPART) $(EXTPART)
 	@echo "ISO	partition.sh"
-	@rm $(ISO) 2>/dev/null || echo jank >/dev/null
+	@rm -f $(ISO)
 	@./partition.sh -vfm "$(MBR)" "$(ISO)" \
 		"$(BOOTPART):13::y" "$(EXTPART):linux::y"
 
